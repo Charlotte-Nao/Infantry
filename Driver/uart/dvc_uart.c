@@ -9,6 +9,7 @@
 
 
 #define UART_RX_QUEUE_LEN 100
+#define UART_RX_BUFFER_SIZE 256
 
 static struct uart_device g_uart1_it;
 static struct uart_device g_uart1_dma;
@@ -18,7 +19,7 @@ struct uart_data {
     UART_HandleTypeDef *handle;
     SemaphoreHandle_t xTxSem;
     QueueHandle_t xRxQueue;
-    uint8_t rxdatas[100];
+    uint8_t rxdatas[UART_RX_BUFFER_SIZE];
 };
 
 static struct uart_data g_uart1_data = {
@@ -28,7 +29,7 @@ static struct uart_data g_uart1_data = {
 static struct uart_data g_uart3_data = {
     .handle = &huart3,
 };
-/***************************************************************************/
+/**********************************************************************************************************************/
 /*回调函数*/
 
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
@@ -46,6 +47,8 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 
     struct uart_data *pData;
     int len = huart->RxXferSize - huart->RxXferCount;
+
+    HAL_GPIO_TogglePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin);
 
     if (huart == &huart1)
     {
@@ -74,9 +77,14 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
     struct uart_data *pData;
     int len = Size;
 
+    HAL_GPIO_TogglePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin);
+
+
     if (huart == &huart1)
     {
         pData = g_uart1_dma.priv_data;
+
+
 
         for (int i = 0; i < len; i++) {
             xQueueSendFromISR(pData->xRxQueue, &pData->rxdatas[i], NULL);
@@ -97,7 +105,7 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
     }
 }
 
-/***************************************************************************/
+/**********************************************************************************************************************/
 /*使用中断*/
 
 static int uart_it_init(struct uart_device *pDev, int baud, int datas, char  parity, int stop)
@@ -159,7 +167,8 @@ static int uart_it_recv(struct uart_device *pDev, char *data, int max_len, int t
         return -1;
     }
 }
-
+/**********************************************************************************************************************/
+/*使用中断实例*/
 static struct uart_device g_uart1_it = {
     "uart1_it",
     uart_it_init,
@@ -169,7 +178,7 @@ static struct uart_device g_uart1_it = {
     &g_uart1_data,
 };
 
-/**********************************************************************************************/
+/**********************************************************************************************************************/
 /*使用DMA*/
 
 
@@ -179,7 +188,7 @@ static int uart_dma_init(struct uart_device *pDev, int baud, int datas, char  pa
     pData->xTxSem = xSemaphoreCreateBinary();
     pData->xRxQueue = xQueueCreate(UART_RX_QUEUE_LEN, sizeof(char));
 
-    HAL_UARTEx_ReceiveToIdle_DMA(pData->handle, &pData->rxdatas, 100);
+    HAL_UARTEx_ReceiveToIdle_DMA(pData->handle, &pData->rxdatas, UART_RX_BUFFER_SIZE);
 
     return 0;
 }
@@ -241,7 +250,8 @@ static int uart_dma_recv(struct uart_device *pDev, char *data, int max_len, int 
     return -1; // 超时
 }
 
-
+/**********************************************************************************************************************/
+/*使用DMA实例*/
 static struct uart_device g_uart1_dma = {
     "uart1_dma",
     uart_dma_init,
@@ -260,10 +270,8 @@ static struct uart_device g_uart3_dma = {
     &g_uart3_data,
 };
 
-
-/**********************************************************************************************/
-
-
+/**********************************************************************************************************************/
+/*对外接口*/
 
 struct uart_device *g_uart_devs[] = {&g_uart1_it, &g_uart1_dma, &g_uart3_dma};
 

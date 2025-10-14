@@ -36,9 +36,13 @@ struct PID_data {
 };
 
 struct PID {
+    char *name;
     void (*init)(struct PID *pid, const fp32 PID[3], fp32 max_out, fp32 max_iout);
     fp32 (*calc)(struct PID *pid, fp32 ref, fp32 set, fp32 speed);
     struct PID_data *pid_data;
 };
 
-fp32 rad_format(fp32 rad);
+extern fp32 rad_format(fp32 rad);
+
+extern struct PID *pid_get_device(const char *name);
+

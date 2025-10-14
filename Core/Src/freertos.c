@@ -26,6 +26,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "../../Task/Main.h"
+#include "../../Task/Auto.h"
+#include "../../Task/Auto_Aim.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -49,7 +51,8 @@
 /* USER CODE END Variables */
 osThreadId defaultTaskHandle;
 osThreadId MainHandle;
-osThreadId ControlHandle;
+osThreadId AutoHandle;
+osThreadId Auto_AimHandle;
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -58,7 +61,8 @@ osThreadId ControlHandle;
 
 void StartDefaultTask(void const * argument);
 extern void main_task(void const * argument);
-extern void Contorl_task(void const * argument);
+extern void Auto_task(void const * argument);
+extern void Auto_Aim_task(void const * argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -113,9 +117,13 @@ void MX_FREERTOS_Init(void) {
   osThreadDef(Main, main_task, osPriorityIdle, 0, 512);
   MainHandle = osThreadCreate(osThread(Main), NULL);
 
-  /* definition and creation of Control */
-  osThreadDef(Control, Contorl_task, osPriorityHigh, 0, 256);
-  ControlHandle = osThreadCreate(osThread(Control), NULL);
+  /* definition and creation of Auto */
+  osThreadDef(Auto, Auto_task, osPriorityHigh, 0, 256);
+  AutoHandle = osThreadCreate(osThread(Auto), NULL);
+
+  /* definition and creation of Auto_Aim */
+  osThreadDef(Auto_Aim, Auto_Aim_task, osPriorityHigh, 0, 512);
+  Auto_AimHandle = osThreadCreate(osThread(Auto_Aim), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */

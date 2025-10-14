@@ -6,14 +6,8 @@
 #define INFANTRY_01_REMOTE_H
 
 #include "../../Application/struct_typedef.h"
-
-struct remote_device {
-    char *name;
-    void (*init)(struct remote_device *pDev);
-    void (*unable)(struct remote_device *pDev);
-    void (*restart)(struct remote_device *pDev, uint16_t dma_buf_num);
-    void *remote_data;
-};
+/**********************************************************************************************************************/
+/*控制信息结构体定义*/
 
 typedef struct __attribute__((packed))
 {
@@ -39,7 +33,14 @@ typedef struct __attribute__((packed))
 
 } RC_ctrl_t;
 
-extern struct remote_device *remote_get_device(const char *name);
+/**********************************************************************************************************************/
+/*函数声明*/
+extern void RC_init(void);
 
-extern const RC_ctrl_t *get_remote_control_point(void);
+extern void RC_unable(void);
+
+extern void RC_restart(uint16_t dma_buf_num);
+
+extern const RC_ctrl_t *RC_get_handle(void);
+
 #endif //INFANTRY_01_REMOTE_H

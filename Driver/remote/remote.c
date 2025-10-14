@@ -10,22 +10,31 @@
 extern UART_HandleTypeDef huart3;
 extern DMA_HandleTypeDef hdma_usart3_rx;
 
-#define SBUS_RX_BUF_NUM 36u
+/**********************************************************************************************************************/
 
-#define RC_FRAME_LENGTH 18u
+#define SBUS_RX_BUF_NUM 36u   /*缓存区长度*/
+#define RC_FRAME_LENGTH 18u   /*有效数据长度*/
+
+/**********************************************************************************************************************/
+/*遥控器摇杆定义*/
 
 #define RC_CH_VALUE_MIN         ((uint16_t)364)
 #define RC_CH_VALUE_OFFSET      ((uint16_t)1024)
 #define RC_CH_VALUE_MAX         ((uint16_t)1684)
 
-/* ----------------------- RC Switch Definition----------------------------- */
+/**********************************************************************************************************************/
+/*遥控器拨杆定义*/
+
 #define RC_SW_UP                ((uint16_t)1)
 #define RC_SW_MID               ((uint16_t)3)
 #define RC_SW_DOWN              ((uint16_t)2)
 #define switch_is_down(s)       (s == RC_SW_DOWN)
 #define switch_is_mid(s)        (s == RC_SW_MID)
 #define switch_is_up(s)         (s == RC_SW_UP)
-/* ----------------------- PC Key Definition-------------------------------- */
+
+/**********************************************************************************************************************/
+/*键值定义*/
+
 #define KEY_PRESSED_OFFSET_W            ((uint16_t)1 << 0)
 #define KEY_PRESSED_OFFSET_S            ((uint16_t)1 << 1)
 #define KEY_PRESSED_OFFSET_A            ((uint16_t)1 << 2)
@@ -46,97 +55,72 @@ extern DMA_HandleTypeDef hdma_usart3_rx;
 static uint8_t sbus_rx_buf[2][SBUS_RX_BUF_NUM];
 RC_ctrl_t remote_ctrl;
 
-struct remote_data {
-    UART_HandleTypeDef *handle;
-    DMA_HandleTypeDef *dma_handle;
-    RC_ctrl_t *rc_ctrl;
-};
+/**********************************************************************************************************************/
+/*对外调用函数*/
 
-void RC_init(struct remote_device *pDev)
+void RC_init(void)
 {
-    struct remote_data *pData = pDev->remote_data;
     //enable the DMA transfer for the receiver request
     //使能DMA串口接收
-    SET_BIT(pData->handle->Instance->CR3, USART_CR3_DMAR);
+    SET_BIT(huart3.Instance->CR3, USART_CR3_DMAR);
 
     //enalbe idle interrupt
     //使能空闲中断
-    __HAL_UART_ENABLE_IT(pData->handle, UART_IT_IDLE);
+    __HAL_UART_ENABLE_IT(&huart3, UART_IT_IDLE);
 
     //disable DMA
     //失效DMA
-    __HAL_DMA_DISABLE(pData->dma_handle);
-    while(pData->dma_handle->Instance->CR & DMA_SxCR_EN)
+    __HAL_DMA_DISABLE(&hdma_usart3_rx);
+    while(hdma_usart3_rx.Instance->CR & DMA_SxCR_EN)
     {
-        __HAL_DMA_DISABLE(pData->dma_handle);
+        __HAL_DMA_DISABLE(&hdma_usart3_rx);
     }
 
-    pData->dma_handle->Instance->PAR = (uint32_t) & (USART3->DR);
+    hdma_usart3_rx.Instance->PAR = (uint32_t) & (USART3->DR);
     //memory buffer 1
     //内存缓冲区1
-    pData->dma_handle->Instance->M0AR = (uint32_t)(sbus_rx_buf[0]);
+    hdma_usart3_rx.Instance->M0AR = (uint32_t)(sbus_rx_buf[0]);
     //memory buffer 2
     //内存缓冲区2
-    pData->dma_handle->Instance->M1AR = (uint32_t)(sbus_rx_buf[1]);
+    hdma_usart3_rx.Instance->M1AR = (uint32_t)(sbus_rx_buf[1]);
     //data length
     //数据长度
-    pData->dma_handle->Instance->NDTR = SBUS_RX_BUF_NUM;
+    hdma_usart3_rx.Instance->NDTR = SBUS_RX_BUF_NUM;
     //enable double memory buffer
     //使能双缓冲区
-    SET_BIT(pData->dma_handle->Instance->CR, DMA_SxCR_DBM);
+    SET_BIT(hdma_usart3_rx.Instance->CR, DMA_SxCR_DBM);
 
     //enable DMA
     //使能DMA
-    __HAL_DMA_ENABLE(pData->dma_handle);
+    __HAL_DMA_ENABLE(&hdma_usart3_rx);
 }
 
-void RC_unable(struct remote_device *pDev)
+void RC_unable(void)
 {
-    struct remote_data *pData = pDev->remote_data;
-    __HAL_UART_DISABLE(pData->handle);
+
+    __HAL_UART_DISABLE(&huart3);
 }
 
-void RC_restart(struct remote_device *pDev, uint16_t dma_buf_num)
+void RC_restart(uint16_t dma_buf_num)
 {
-    struct remote_data *pData = pDev->remote_data;
-    __HAL_UART_DISABLE(pData->handle);
-    __HAL_DMA_DISABLE(pData->dma_handle);
+    __HAL_UART_DISABLE(&huart3);
+    __HAL_DMA_DISABLE(&hdma_usart3_rx);
 
-    pData->dma_handle->Instance->NDTR = dma_buf_num;
+    hdma_usart3_rx.Instance->NDTR = dma_buf_num;
 
-    __HAL_DMA_ENABLE(pData->dma_handle);
-    __HAL_UART_ENABLE(pData->handle);
+    __HAL_DMA_ENABLE(&hdma_usart3_rx);
+    __HAL_UART_ENABLE(&huart3);
 }
 
-struct remote_data remote_data = {
-    .handle = &huart3,
-    .dma_handle = &hdma_usart3_rx,
-    .rc_ctrl = &remote_ctrl,
-};
+const RC_ctrl_t *RC_get_handle(void)
+{
+    return &remote_ctrl;
+}
 
-struct remote_device remote = {
-    "remote",
-    RC_init,
-    RC_unable,
-    RC_restart,
-    &remote_data,
-};
 
 /**********************************************************************************************************************/
-/*对外接口*/
-struct remote_device *remote_list[] = {&remote};
+/*数据处理*/
 
-struct remote_device *remote_get_device(const char *name)
-{
-    for (unsigned i = 0; i < sizeof(remote_list) / sizeof(remote_list[0]); ++i) {
-        if (strcmp(remote_list[i]->name, name) == 0) {
-            return remote_list[i];
-        }
-    }
-    return NULL;
-}
-
-/**********************************************************************************************************************/
 static void sbus_to_rc(volatile const uint8_t *sbus_buf, RC_ctrl_t *rc_ctrl)
 {
     if (sbus_buf == NULL || rc_ctrl == NULL)
@@ -166,13 +150,11 @@ static void sbus_to_rc(volatile const uint8_t *sbus_buf, RC_ctrl_t *rc_ctrl)
     rc_ctrl->rc.ch[4] -= RC_CH_VALUE_OFFSET;
 }
 
-const RC_ctrl_t *get_remote_control_point(void)
-{
-    return &remote_ctrl;
-}
+/**********************************************************************************************************************/
+/*空闲中断处理*/
 
+/*记得使能USART3的全局中断并且取消勾选生成标准中断处理函数（下面已实现会重复定义）*/
 
-//串口中断
 void USART3_IRQHandler(void)
 {
     if(huart3.Instance->SR & UART_FLAG_RXNE)//接收到数据
@@ -204,6 +186,7 @@ void USART3_IRQHandler(void)
             //set memory buffer 1
             //设定缓冲区1
             hdma_usart3_rx.Instance->CR |= DMA_SxCR_CT;
+
 
             //enable DMA
             //使能DMA

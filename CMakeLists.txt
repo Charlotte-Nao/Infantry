@@ -39,20 +39,35 @@ add_executable(${CMAKE_PROJECT_NAME}
         Task/Main.c
         Task/Main.h
         Application/struct_typedef.h
-        Devices/pid/pid.c
-        Devices/pid/pid.h
-        Application/can_control_motor.c
-        Application/can_control_motor.h
-        Application/LED.c
-        Application/LED.h
-        Devices/uart/dvc_uart.c
-        Devices/uart/dvc_uart.h
-        Task/Control.c
-        Task/Control.h
-        Devices/motor/motor.c
-        Devices/motor/motor.h
-        Devices/remote/remote.c
-        Devices/remote/remote.h
+        Algorithm/pid/pid.c
+        Algorithm/pid/pid.h
+        Driver/can/can.c
+        Driver/can/can.h
+        Driver/LED/LED.c
+        Driver/LED/LED.h
+        Driver/uart/dvc_uart.c
+        Driver/uart/dvc_uart.h
+        Device/motor/motor.c
+        Device/motor/motor.h
+        Driver/remote/remote.c
+        Driver/remote/remote.h
+        Driver/motor_pwm/fire_control.c
+        Driver/motor_pwm/fire_control.h
+        Driver/ins/ist8310_i2c/ist8310_i2c.c
+        Driver/ins/ist8310_i2c/ist8310_i2c.h
+        Task/Auto.c
+        Task/Auto.h
+        Driver/ins/BMI088/BMI088driver.c
+        Driver/ins/BMI088/BMI088Middleware.c
+        Algorithm/MahonyAHRS/MahonyAHRS.c
+        Application/mahony.c
+        Application/mahony.h
+        Application/motor_control.c
+        Application/motor_control.h
+        Application/auto_aim.c
+        Application/auto_aim.h
+        Task/Auto_Aim.c
+        Task/Auto_Aim.h
 )
 
 # Add STM32CubeMX generated sources
