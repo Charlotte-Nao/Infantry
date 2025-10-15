@@ -161,7 +161,7 @@ void main_task(void const *argument) {
     yaw_pose = INS_angle[0];
     last_INS_angle_yaw = INS_angle[0];
     yaw_keep_pid = pid_get_device("yaw_keep");
-    const fp32 yaw_keep_pid_param[3] = {0.4f, 0, -10};
+    const fp32 yaw_keep_pid_param[3] = {0.2f, 0, -10};
     yaw_keep_pid->init(yaw_keep_pid, yaw_keep_pid_param, pi / 18, 0);
     yaw_auto_pid = pid_get_device("yaw_auto");
     const fp32 yaw_auto_pid_param[3] = {0.05f, 0, -0.1f};
@@ -174,7 +174,7 @@ void main_task(void const *argument) {
     pitch_pose = INS_angle[2];
     last_INS_angle_pitch = INS_angle[2];
     pitch_keep_pid = pid_get_device("pitch_keep");
-    const fp32 pitch_keep_pid_param[3] = {0.2f, 0, 0};
+    const fp32 pitch_keep_pid_param[3] = {0.05f, 0, -2.5f};
     pitch_keep_pid->init(pitch_keep_pid, pitch_keep_pid_param, pi / 18, 0);
     pitch_auto_pid = pid_get_device("pitch_auto");
     const fp32 pitch_auto_pid_param[3] = {0.025f, 0, -0.5f};
@@ -186,7 +186,7 @@ void main_task(void const *argument) {
         /***********************************************************************************************************/
         /*自瞄*/
 
-        Uart->Print(Uart, "%d%d\n", (int)(1000*pitch_pose), (int)(1000*INS_angle[2]));
+        //Uart->Print(Uart, "%d%d\n", (int)(1000*yaw_pose), (int)(1000*pitch_pose));
         if (target_ok == 1) {
             LED_GREEN_SET();
         }
@@ -198,6 +198,7 @@ void main_task(void const *argument) {
                 auto_aim_control(&target_info, &yaw_aim, &pitch_aim);
                 yaw_pose = yaw_aim;
                 pitch_pose = pitch_aim;
+                Uart->Print(Uart, "%d,%d\n", (int)(1000*INS_angle[0]), (int)(1000*INS_angle[2]));
             }
 
             yaw_speed = yaw_keep_pid->calc(yaw_keep_pid, INS_angle[0], yaw_pose, INS_angle[0] - last_INS_angle_yaw);

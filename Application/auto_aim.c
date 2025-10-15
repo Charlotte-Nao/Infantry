@@ -27,11 +27,6 @@ int parse_target_data(target_info_t *target) {
     if (received_len > 0) {
         buffer[received_len-1] = '\0';
 
-        // 检查数据头
-        if (strncmp(buffer, "ARMOR,", 6) != 0) {
-            return -1;
-        }
-
         // 分步解析
         char *token;
         char *rest = buffer;
@@ -43,7 +38,7 @@ int parse_target_data(target_info_t *target) {
         target->aim_target_yaw = strtof(token, NULL);
 
         // 解析 pitch
-        token = strtok_r(NULL, ",\n", &rest); // 也以换行符作为分隔符
+        token = strtok_r(NULL, ",", &rest); // 也以换行符作为分隔符
         if (!token) return -1;
         target->aim_target_pitch = strtof(token, NULL);
 
@@ -65,6 +60,7 @@ int is_target_valid(target_info_t *target) {
 
 void auto_aim_control(target_info_t *target, float *yaw_output, float *pitch_output) {
     *yaw_output = target->aim_target_yaw;
-    *pitch_output = target->aim_target_pitch;
+    *pitch_output = target->aim_target_pitch>0.45?0.45:target->aim_target_pitch;
+    *pitch_output = *pitch_output<-0.45?-0.45:*pitch_output;
 }
 
