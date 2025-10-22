@@ -6,14 +6,18 @@
 
 // 全局变量
 static struct uart_device *auto_aim_uart = NULL;
+static struct usb_device *auto_aim_usb = NULL;
 
 // 初始化自瞄系统
-int auto_aim_init(struct uart_device *uart_dev) {
-    if (uart_dev == NULL) {
+int auto_aim_init(struct usb_device *usb_dev) {
+    if (usb_dev == NULL) {
         return -1;
     }
 
-    auto_aim_uart = uart_dev;
+    //auto_aim_uart
+    //
+    //= uart_dev;
+    auto_aim_usb = usb_dev;
 
     return 0;
 }
@@ -22,7 +26,8 @@ int auto_aim_init(struct uart_device *uart_dev) {
 
 int parse_target_data(target_info_t *target) {
     char buffer[100];
-    int received_len = auto_aim_uart->Recv(auto_aim_uart, buffer, sizeof(buffer) - 1, 200);
+    //int received_len = auto_aim_uart->Recv(auto_aim_uart, buffer, sizeof(buffer) - 1, 200);
+    int received_len = auto_aim_usb->Recv(auto_aim_usb, buffer, sizeof(buffer) - 1, 200);
 
     if (received_len > 0) {
         buffer[received_len-1] = '\0';

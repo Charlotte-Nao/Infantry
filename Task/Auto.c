@@ -14,6 +14,7 @@
 #include "../Driver/ins/ist8310_i2c/ist8310_i2c.h"
 #include "../Driver/ins/BMI088/BMI088driver.h"
 #include "../Driver/uart/dvc_uart.h"
+#include "../Driver/usb_cdc/usb_cdc.h"
 
 /**********************************************************************************************************************/
 /*数据*/

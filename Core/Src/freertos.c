@@ -64,6 +64,7 @@ extern void main_task(void const * argument);
 extern void Auto_task(void const * argument);
 extern void Auto_Aim_task(void const * argument);
 
+extern void MX_USB_DEVICE_Init(void);
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
 /* GetIdleTaskMemory prototype (linked to static allocation support) */
@@ -122,7 +123,7 @@ void MX_FREERTOS_Init(void) {
   AutoHandle = osThreadCreate(osThread(Auto), NULL);
 
   /* definition and creation of Auto_Aim */
-  osThreadDef(Auto_Aim, Auto_Aim_task, osPriorityHigh, 0, 512);
+  osThreadDef(Auto_Aim, Auto_Aim_task, osPriorityHigh, 0, 2048);
   Auto_AimHandle = osThreadCreate(osThread(Auto_Aim), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
@@ -140,6 +141,8 @@ void MX_FREERTOS_Init(void) {
 /* USER CODE END Header_StartDefaultTask */
 void StartDefaultTask(void const * argument)
 {
+  /* init code for USB_DEVICE */
+  MX_USB_DEVICE_Init();
   /* USER CODE BEGIN StartDefaultTask */
   /* Infinite loop */
   for(;;)

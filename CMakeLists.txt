@@ -68,6 +68,8 @@ add_executable(${CMAKE_PROJECT_NAME}
         Application/auto_aim.h
         Task/Auto_Aim.c
         Task/Auto_Aim.h
+        Driver/usb_cdc/usb_cdc.c
+        Driver/usb_cdc/usb_cdc.h
 )
 
 # Add STM32CubeMX generated sources
