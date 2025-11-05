@@ -8,6 +8,7 @@
 #include "../Application/struct_typedef.h"
 
 extern fp32 INS_angle[];
+extern fp32 INS_quat[];
 
 extern void Auto_task(void const * argument);
 

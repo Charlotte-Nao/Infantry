@@ -119,7 +119,7 @@ void MX_FREERTOS_Init(void) {
   MainHandle = osThreadCreate(osThread(Main), NULL);
 
   /* definition and creation of Auto */
-  osThreadDef(Auto, Auto_task, osPriorityHigh, 0, 256);
+  osThreadDef(Auto, Auto_task, osPriorityRealtime, 0, 256);
   AutoHandle = osThreadCreate(osThread(Auto), NULL);
 
   /* definition and creation of Auto_Aim */

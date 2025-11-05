@@ -5,6 +5,7 @@
 #include "Auto_Aim.h"
 #include "cmsis_os.h"
 
+#include "Auto.h"
 #include "../Driver/uart/dvc_uart.h"
 #include "../Driver/usb_cdc/usb_cdc.h"
 
@@ -27,7 +28,8 @@ void Auto_Aim_task(void const *argument) {
             target_ok = 0;
         }
 
-        Usb->Print(Usb, "target_ok: %d\r\n", target_ok);
+        //Usb->Print(Usb, "target_ok: %d\r\n", target_ok);
+        Usb->Print(Usb, "%.3f,%.3f,%.3f,%.3f\r\n", INS_quat[0], INS_quat[1], INS_quat[2], INS_quat[3]);
 
         vTaskDelay(10);
     }
