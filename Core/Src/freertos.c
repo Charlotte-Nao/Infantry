@@ -25,9 +25,6 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "../../Task/Main.h"
-#include "../../Task/Auto.h"
-#include "../../Task/Auto_Aim.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -50,9 +47,10 @@
 
 /* USER CODE END Variables */
 osThreadId defaultTaskHandle;
-osThreadId MainHandle;
-osThreadId AutoHandle;
-osThreadId Auto_AimHandle;
+osThreadId testHandle;
+osThreadId sensor_taskHandle;
+osThreadId control_taskHandle;
+osThreadId logic_taskHandle;
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -60,9 +58,10 @@ osThreadId Auto_AimHandle;
 /* USER CODE END FunctionPrototypes */
 
 void StartDefaultTask(void const * argument);
-extern void main_task(void const * argument);
-extern void Auto_task(void const * argument);
-extern void Auto_Aim_task(void const * argument);
+extern void test_task(void const * argument);
+extern void sensor_task_func(void const * argument);
+extern void control_task_func(void const * argument);
+extern void logic_task_func(void const * argument);
 
 extern void MX_USB_DEVICE_Init(void);
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
@@ -114,17 +113,21 @@ void MX_FREERTOS_Init(void) {
   osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 128);
   defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
 
-  /* definition and creation of Main */
-  osThreadDef(Main, main_task, osPriorityIdle, 0, 512);
-  MainHandle = osThreadCreate(osThread(Main), NULL);
+  /* definition and creation of test */
+  osThreadDef(test, test_task, osPriorityIdle, 0, 1024);
+  testHandle = osThreadCreate(osThread(test), NULL);
 
-  /* definition and creation of Auto */
-  osThreadDef(Auto, Auto_task, osPriorityRealtime, 0, 256);
-  AutoHandle = osThreadCreate(osThread(Auto), NULL);
+  /* definition and creation of sensor_task */
+  osThreadDef(sensor_task, sensor_task_func, osPriorityHigh, 0, 128);
+  sensor_taskHandle = osThreadCreate(osThread(sensor_task), NULL);
 
-  /* definition and creation of Auto_Aim */
-  osThreadDef(Auto_Aim, Auto_Aim_task, osPriorityHigh, 0, 2048);
-  Auto_AimHandle = osThreadCreate(osThread(Auto_Aim), NULL);
+  /* definition and creation of control_task */
+  osThreadDef(control_task, control_task_func, osPriorityRealtime, 0, 256);
+  control_taskHandle = osThreadCreate(osThread(control_task), NULL);
+
+  /* definition and creation of logic_task */
+  osThreadDef(logic_task, logic_task_func, osPriorityAboveNormal, 0, 512);
+  logic_taskHandle = osThreadCreate(osThread(logic_task), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */

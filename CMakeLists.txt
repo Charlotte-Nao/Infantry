@@ -36,40 +36,42 @@ enable_language(C ASM)
 
 # Create an executable object type
 add_executable(${CMAKE_PROJECT_NAME}
-        Task/Main.c
-        Task/Main.h
         Application/struct_typedef.h
-        Algorithm/pid/pid.c
-        Algorithm/pid/pid.h
-        Driver/can/can.c
-        Driver/can/can.h
-        Driver/LED/LED.c
-        Driver/LED/LED.h
-        Driver/uart/dvc_uart.c
-        Driver/uart/dvc_uart.h
-        Device/motor/motor.c
-        Device/motor/motor.h
-        Driver/remote/remote.c
-        Driver/remote/remote.h
-        Driver/motor_pwm/fire_control.c
-        Driver/motor_pwm/fire_control.h
-        Driver/ins/ist8310_i2c/ist8310_i2c.c
-        Driver/ins/ist8310_i2c/ist8310_i2c.h
-        Task/Auto.c
-        Task/Auto.h
-        Driver/ins/BMI088/BMI088driver.c
-        Driver/ins/BMI088/BMI088Middleware.c
+        Bsp/can/bsp_can.c
+        Bsp/can/bsp_can.h
+        Bsp/LED/bsp_LED.c
+        Bsp/LED/bsp_LED.h
+        Bsp/uart/bsp_uart.c
+        Bsp/uart/bsp_uart.h
+        Components/remote/remote.c
+        Components/remote/remote.h
+        Components/ist8310_i2c/ist8310_driver.c
+        Components/ist8310_i2c/ist8310_driver.h
+        Components/BMI088/BMI088driver.c
+        Components/BMI088/BMI088Middleware.c
         Algorithm/MahonyAHRS/MahonyAHRS.c
         Application/mahony.c
         Application/mahony.h
-        Application/motor_control.c
-        Application/motor_control.h
         Application/auto_aim.c
         Application/auto_aim.h
-        Task/Auto_Aim.c
-        Task/Auto_Aim.h
-        Driver/usb_cdc/usb_cdc.c
-        Driver/usb_cdc/usb_cdc.h
+        Bsp/usb_cdc/bsp_usb_cdc.c
+        Bsp/usb_cdc/bsp_usb_cdc.h
+        Components/motor/motor.c
+        Components/ist8310_i2c/ist8310_middleware.c
+        Components/ist8310_i2c/ist8310_middleware.h
+        ALL_Task/test.c
+        ALL_Task/test.h
+        ALL_Task/test.c
+        Application/robot_global.c
+        Application/robot_global.h
+        ALL_Task/sensor_task.c
+        ALL_Task/sensor_task.h
+        ALL_Task/control_task.c
+        ALL_Task/control_task.h
+        ALL_Task/logic_task.c
+        ALL_Task/logic_task.h
+        Application/chassis_kinematics.c
+        Application/chassis_kinematics.h
 )
 
 # Add STM32CubeMX generated sources

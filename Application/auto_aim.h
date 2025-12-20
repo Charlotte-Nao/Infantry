@@ -2,8 +2,8 @@
 #define AUTOAIM_H
 
 
-#include "../Driver/uart/dvc_uart.h"
-#include "../Driver/usb_cdc/usb_cdc.h"
+#include "../Bsp/uart/bsp_uart.h"
+#include "../Bsp/usb_cdc/bsp_usb_cdc.h"
 #include <stdint.h>
 
 
