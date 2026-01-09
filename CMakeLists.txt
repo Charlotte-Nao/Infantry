@@ -72,8 +72,6 @@ add_executable(${CMAKE_PROJECT_NAME}
         ALL_Task/logic_task.h
         Application/chassis_kinematics.c
         Application/chassis_kinematics.h
-        Components/imagetrans_remote/imagetrans_remote.c
-        Components/imagetrans_remote/imagetrans_remote.c
 )
 
 # Add STM32CubeMX generated sources

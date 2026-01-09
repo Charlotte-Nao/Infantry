@@ -18,7 +18,7 @@ void Robot_Global_Init(void) {
     robot_ctrl.shoot_mode   = SHOOT_STOP;
 
     // 3. 关联遥控器句柄 (需要确保 RC_get_handle 返回的是包含遥控器数据的静态指针)
-    robot_ctrl.rc = RC_get_handle();
+    robot_ctrl.rc = RC_Get_Handle();
 
     // 4. 默认裁判系统阈值初始值
     robot_ctrl.judge_info.shooter_heat_limit = 240;
