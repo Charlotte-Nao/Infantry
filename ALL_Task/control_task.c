@@ -35,7 +35,7 @@ void control_task_func(void const * argument) {
         }
 
         /* --- 发射物理使能 (含摩擦轮和拨弹轮) --- */
-        if (robot_ctrl.shoot_mode == SHOOT_STOP || robot_ctrl.gimbal_mode == GIMBAL_RELAX) {
+        if (robot_ctrl.shoot_mode == SHOOT_STOP) {
             shoot_l->send_disable_cmd(shoot_l);
             shoot_r->send_disable_cmd(shoot_r);
             stir_m->send_disable_cmd(stir_m);

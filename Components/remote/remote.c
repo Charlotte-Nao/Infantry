@@ -7,50 +7,10 @@
 #include "usart.h"
 #include "string.h"
 
-extern UART_HandleTypeDef huart3;
-extern DMA_HandleTypeDef hdma_usart3_rx;
+extern UART_HandleTypeDef huart6;
+extern DMA_HandleTypeDef hdma_usart6_rx;
 
 /**********************************************************************************************************************/
-
-#define SBUS_RX_BUF_NUM 36u   /*缓存区长度*/
-#define RC_FRAME_LENGTH 18u   /*有效数据长度*/
-
-/**********************************************************************************************************************/
-/*遥控器摇杆定义*/
-
-#define RC_CH_VALUE_MIN         ((uint16_t)364)
-#define RC_CH_VALUE_OFFSET      ((uint16_t)1024)
-#define RC_CH_VALUE_MAX         ((uint16_t)1684)
-
-/**********************************************************************************************************************/
-/*遥控器拨杆定义*/
-
-#define RC_SW_UP                ((uint16_t)1)
-#define RC_SW_MID               ((uint16_t)3)
-#define RC_SW_DOWN              ((uint16_t)2)
-#define switch_is_down(s)       (s == RC_SW_DOWN)
-#define switch_is_mid(s)        (s == RC_SW_MID)
-#define switch_is_up(s)         (s == RC_SW_UP)
-
-/**********************************************************************************************************************/
-/*键值定义*/
-
-#define KEY_PRESSED_OFFSET_W            ((uint16_t)1 << 0)
-#define KEY_PRESSED_OFFSET_S            ((uint16_t)1 << 1)
-#define KEY_PRESSED_OFFSET_A            ((uint16_t)1 << 2)
-#define KEY_PRESSED_OFFSET_D            ((uint16_t)1 << 3)
-#define KEY_PRESSED_OFFSET_SHIFT        ((uint16_t)1 << 4)
-#define KEY_PRESSED_OFFSET_CTRL         ((uint16_t)1 << 5)
-#define KEY_PRESSED_OFFSET_Q            ((uint16_t)1 << 6)
-#define KEY_PRESSED_OFFSET_E            ((uint16_t)1 << 7)
-#define KEY_PRESSED_OFFSET_R            ((uint16_t)1 << 8)
-#define KEY_PRESSED_OFFSET_F            ((uint16_t)1 << 9)
-#define KEY_PRESSED_OFFSET_G            ((uint16_t)1 << 10)
-#define KEY_PRESSED_OFFSET_Z            ((uint16_t)1 << 11)
-#define KEY_PRESSED_OFFSET_X            ((uint16_t)1 << 12)
-#define KEY_PRESSED_OFFSET_C            ((uint16_t)1 << 13)
-#define KEY_PRESSED_OFFSET_V            ((uint16_t)1 << 14)
-#define KEY_PRESSED_OFFSET_B            ((uint16_t)1 << 15)
 
 static uint8_t sbus_rx_buf[2][SBUS_RX_BUF_NUM];
 RC_ctrl_t remote_ctrl;
@@ -170,13 +130,13 @@ void USART3_IRQHandler(void)
         if ((hdma_usart3_rx.Instance->CR & DMA_SxCR_CT) == RESET)
         {
             /* Current memory buffer used is Memory 0 */
+            //获取接收数据长度,长度 = 设定长度 - 剩余长度
 
             //disable DMA
             //失效DMA
             __HAL_DMA_DISABLE(&hdma_usart3_rx);
 
             //get receive data length, length = set_data_length - remain_length
-            //获取接收数据长度,长度 = 设定长度 - 剩余长度
             this_time_rx_len = SBUS_RX_BUF_NUM - hdma_usart3_rx.Instance->NDTR;
 
             //reset set_data_lenght

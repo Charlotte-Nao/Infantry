@@ -46,6 +46,8 @@ void test_task(void const * argument)
         //Uart->Print(Uart, "%f,%f,%f\r\n", robot_ctrl.imu.yaw, robot_ctrl.imu.pitch, robot_ctrl.imu.roll);
         //Uart->Print(Uart, "%d,%d\r\n", robot_ctrl.rc->rc.ch[0], robot_ctrl.rc->rc.ch[1]);
 
+
+
         vTaskDelay(10000);
     }
 }
