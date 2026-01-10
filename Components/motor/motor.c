@@ -1182,10 +1182,10 @@ static void All_Motors_Init(void) {
     // 1. 达妙 PITCH (MIT模式) - 注意使用 CAN2
     // 参数含义: [ID, 句柄, 参数个数, Kp, Kd, P_MAX, V_MAX, T_MAX]
     J4310_PITCH.init(&J4310_PITCH, 0x01, &hcan2, 5,
-                     10.0,  /* Kp: 位置响应强度 */
-                     1.0,   /* Kd: 阻尼，防止震荡 */
+                     15.0,  /* Kp: 位置响应强度 */
+                     2.0,   /* Kd: 阻尼，防止震荡 */
                      12.5,  /* P_MAX: 位置限幅 (rad) */
-                     30.0,  /* V_MAX: 速度限幅 (rad/s) */
+                     3.0,  /* V_MAX: 速度限幅 (rad/s) */
                      10.0   /* T_MAX: 扭矩限幅 (N·m) */
     );
 
