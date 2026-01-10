@@ -13,7 +13,7 @@ static fp32 gyro[3], accel[3], temp;
 // 零偏抑制相关变量
 static fp32 gyro_bias[3] = {0.0f, 0.0f, 0.0f}; // 陀螺仪零偏
 static uint16_t cali_count = 0;
-#define CALI_SAMPLES 500                       // 校准采样次数 (500ms)
+#define CALI_SAMPLES 1000                       // 校准采样次数 (500ms)
 
 void sensor_task_func(void const * argument) {
     // 1. 硬件初始化
@@ -60,13 +60,13 @@ void sensor_task_func(void const * argument) {
         ins_angle[2] = atan2f(2.0f*(INS_q[0]*INS_q[1]+INS_q[2]*INS_q[3]), 2.0f*(INS_q[0]*INS_q[0]+INS_q[3]*INS_q[3])-1.0f); // Pitch
 
         // 7. 同步到全局变量 (弧度)
-        robot_ctrl.imu.yaw   = ins_angle[0];
-        robot_ctrl.imu.pitch = ins_angle[2];
-        robot_ctrl.imu.roll  = ins_angle[1];
+        robot_ctrl.gimbal.yaw   = ins_angle[0];
+        robot_ctrl.gimbal.pitch = ins_angle[2];
+        robot_ctrl.gimbal.roll  = ins_angle[1];
 
         // 同步角速度反馈 (直接给 PID 使用经过消偏后的数据)
-        robot_ctrl.imu.yaw_v   = gyro[2];
-        robot_ctrl.imu.pitch_v = gyro[1];
+        robot_ctrl.gimbal.yaw_v   = gyro[2];
+        robot_ctrl.gimbal.pitch_v = gyro[1];
 
         vTaskDelay(1);
     }

@@ -1,4 +1,6 @@
 #include "remote.h"
+
+#include "cmsis_os.h"
 #include "usart.h"
 #include "string.h"
 
@@ -97,6 +99,8 @@ static void RC_Data_Parse(volatile const uint8_t *p_frame)
 
     // 4. 映射键盘
     remote_ctrl.key.v = raw->key_v;
+
+    remote_ctrl.last_update_tick = osKernelSysTick();
 }
 
 /**
@@ -105,7 +109,6 @@ static void RC_Data_Parse(volatile const uint8_t *p_frame)
  */
 void USART6_IRQHandler(void)
 {
-    LED_GREEN_Toggle();
     if (huart6.Instance->SR & UART_FLAG_IDLE)
     {
         __HAL_UART_CLEAR_IDLEFLAG(&huart6);

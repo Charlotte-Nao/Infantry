@@ -59,19 +59,16 @@ add_executable(${CMAKE_PROJECT_NAME}
         Components/motor/motor.c
         Components/ist8310_i2c/ist8310_middleware.c
         Components/ist8310_i2c/ist8310_middleware.h
-        ALL_Task/test.c
-        ALL_Task/test.h
-        ALL_Task/test.c
         Application/robot_global.c
         Application/robot_global.h
         ALL_Task/sensor_task.c
         ALL_Task/sensor_task.h
-        ALL_Task/control_task.c
-        ALL_Task/control_task.h
-        ALL_Task/logic_task.c
-        ALL_Task/logic_task.h
-        Application/chassis_kinematics.c
-        Application/chassis_kinematics.h
+        ALL_Task/motor_task.c
+        ALL_Task/motor_task.h
+        ALL_Task/chassis_task.c
+        ALL_Task/chassis_task.h
+        ALL_Task/gimbal_task.c
+        ALL_Task/gimbal_task.h
 )
 
 # Add STM32CubeMX generated sources

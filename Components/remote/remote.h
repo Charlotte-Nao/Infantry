@@ -84,6 +84,9 @@ typedef struct {
     struct {
         uint16_t v;         // 键盘位图
     } key;
+
+    uint32_t last_update_tick;  // 上次更新时间
+
 } RC_ctrl_t;
 
 void RC_Init(void);
