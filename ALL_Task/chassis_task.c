@@ -105,41 +105,49 @@ void chassis_task_func(void const * argument) {
                     LED_BLUE_RESET();
                     LED_GREEN_SET();
 
-                    // --- A. 解析遥控器数据 ---
-                    float vx_rc = (abs(robot_ctrl.rc->rc.ch[0]) > RC_DEADZONE) ? robot_ctrl.rc->rc.ch[0] / 660.0f : 0;
-                    float vy_rc = (abs(robot_ctrl.rc->rc.ch[1]) > RC_DEADZONE) ? robot_ctrl.rc->rc.ch[1] / 660.0f : 0;
-                    float vw_rc = (abs(robot_ctrl.rc->rc.wheel) > RC_DEADZONE) ? robot_ctrl.rc->rc.wheel / 660.0f : 0;
+                    // --- A. 输入源融合 (遥控器摇杆 + 键盘) ---
+                    float vx_rc = (abs(rc->rc.ch[0]) > RC_DEADZONE) ? rc->rc.ch[0] / 660.0f : 0;
+                    float vy_rc = (abs(rc->rc.ch[1]) > RC_DEADZONE) ? rc->rc.ch[1] / 660.0f : 0;
+                    float vw_rc = (abs(rc->rc.wheel) > RC_DEADZONE) ? rc->rc.wheel / 660.0f : 0;
 
-                    // --- B. 各向同性平移处理 (防除零) ---
-                    float v_sum = sqrtf(vx_rc * vx_rc + vy_rc * vy_rc);
-                    if (v_sum > 1.0f) {
-                        // 只有总矢量超过 1.0 时才缩放，保证小范围控制感
-                        vx_rc /= v_sum;
-                        vy_rc /= v_sum;
+                    float vx_kb = 0, vy_kb = 0, vw_kb = 0;
+                    // Shift 加速逻辑
+                    float speed_ratio = (rc->key.v & KEY_SHIFT) ? 1.0f : 0.5f;
+
+                    if (rc->key.v & KEY_W) vx_kb += speed_ratio;
+                    if (rc->key.v & KEY_S) vx_kb -= speed_ratio;
+                    if (rc->key.v & KEY_A) vy_kb += speed_ratio;
+                    if (rc->key.v & KEY_D) vy_kb -= speed_ratio;
+                    if (rc->key.v & KEY_Q) vw_kb += 0.5f; // 手动左旋
+                    if (rc->key.v & KEY_E) vw_kb -= 0.5f; // 手动右旋
+
+                    float total_vx = vx_rc + vx_kb;
+                    float total_vy = vy_rc + vy_kb;
+
+                    // --- B. 各向同性限速 ---
+                    float v_norm = sqrtf(total_vx * total_vx + total_vy * total_vy);
+                    if (v_norm > speed_ratio) {
+                        total_vx = total_vx / v_norm * speed_ratio;
+                        total_vy = total_vy / v_norm * speed_ratio;
                     }
 
-                    // --- C. 跟随与自由旋转逻辑 ---
-                    float vw_final = 0;
-                    float yaw_m_pos; // 这里的 POS 应该是云台相对于底盘的相对编码器角度
+                    // --- C. 跟随与旋转逻辑 ---
+                    float yaw_m_pos;
                     yaw_m->get_status(yaw_m, "POS", &yaw_m_pos);
-
-                    // 角度归一化函数，确保在 -PI 到 PI 之间 (假设 YAW_CENTER_OFFSET 是对中位)
                     float angle_error = Rad_Format(yaw_m_pos - YAW_CENTER_OFFSET);
 
-                    if (fabsf(vw_rc) > 0.05f) {
-                        // 1. 如果拨轮在动，执行自由旋转
-                        vw_final = vw_rc;
+                    float vw_final = 0;
+                    // 键盘 QE 或 摇杆拨轮 优先于 自动跟随
+                    if (fabsf(vw_rc) > 0.05f || fabsf(vw_kb) > 0.01f) {
+                        vw_final = vw_rc + vw_kb;
                     } else {
-                        // 2. 如果拨轮松开，底盘自动跟随云台 (使用比例控制对齐)
-                        // FOLLOW_P_GAIN 通常取 1.5 ~ 4.0 之间
                         vw_final = -angle_error * FOLLOW_P_GAIN;
                     }
                     robot_ctrl.chassis.yaw_speed = vw_final * CHASSIS_MAX_RAD;
 
-                    // --- D. 随动坐标系变换 (让底盘 W A S D 始终相对于云台方向) ---
-                    // 如果不加这个，底盘旋转时 W 就不是朝向云台指的方向了
-                    float final_vx = vx_rc * cosf(angle_error) - vy_rc * sinf(angle_error);
-                    float final_vy = vx_rc * sinf(angle_error) + vy_rc * cosf(angle_error);
+                    // --- D. 随动坐标系变换 (WASD 以云台为基准) ---
+                    float final_vx = total_vx * cosf(angle_error) - total_vy * sinf(angle_error);
+                    float final_vy = total_vx * sinf(angle_error) + total_vy * cosf(angle_error);
 
                     // --- E. 逆运动学计算 ---
                     wheel_targets[0] = (-final_vx - final_vy - vw_final) * MOTOR_RPM_TO_VECTOR;
@@ -147,7 +155,6 @@ void chassis_task_func(void const * argument) {
                     wheel_targets[2] = (final_vx + final_vy - vw_final) * MOTOR_RPM_TO_VECTOR;
                     wheel_targets[3] = (final_vx - final_vy - vw_final) * MOTOR_RPM_TO_VECTOR;
 
-                    // 写入目标
                     for (int i = 0; i < 4; i++) {
                         if (chassis[i]) chassis[i]->set_target(chassis[i], 1, wheel_targets[i]);
                     }
