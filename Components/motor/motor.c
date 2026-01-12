@@ -1221,7 +1221,7 @@ static void All_Motors_Init(void) {
     GM6020_YAW.init(&GM6020_YAW, 0x206, &hcan1, 6,
                     800.0,     /* P_Kp */
                     0.0,      /* P_Ki */
-                    50.0,    /* V_Kp */
+                    200.0,    /* V_Kp */
                     0.0,      /* V_Ki */
                     0.0,      /* V_Kd */
                     25000.0   /* Out_Max */
