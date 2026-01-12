@@ -12,6 +12,7 @@
 #include "../../Bsp/uart/bsp_uart.h"
 #include "../../Bsp/led/bsp_led.h"
 #include "../../Components/remote/remote.h"
+#include "../../Application/auto_aim.h"
 
 
 #define RC_DEADZONE         10
@@ -49,6 +50,8 @@ void gimbal_task_func(void const * argument) {
     struct motor_device *shoot_l = motor_get_device("M3508_SHOOT_L");
     struct motor_device *shoot_r = motor_get_device("M3508_SHOOT_R");
     struct motor_device *stir_m  = motor_get_device("M2006_TRIGGER");
+
+
 
     // 获取控制设别句柄
     const RC_ctrl_t *rc = robot_ctrl.rc;
@@ -123,7 +126,6 @@ void gimbal_task_func(void const * argument) {
                     is_initialized = 0; // 关闭时重置初始化标记
                 }
             }
-
             // 在使能状态下处理模式切换
             if (mode_trigger && robot_ctrl.gimbal_mode != GIMBAL_RELAX) {
                 robot_ctrl.gimbal_mode = (robot_ctrl.gimbal_mode == GIMBAL_REMOTE) ?
@@ -143,10 +145,6 @@ void gimbal_task_func(void const * argument) {
                 is_initialized = 1;
             }
 
-            // 灯光指示：工作模式
-            LED_RED_RESET(); LED_BLUE_SET(); LED_GREEN_RESET();
-
-
             if (robot_ctrl.gimbal_mode == GIMBAL_REMOTE) {
                 // --- A. 摇杆控制 ---
                 float ry = (abs(rc->rc.ch[2]) > RC_DEADZONE) ? rc->rc.ch[2] / 660.0f : 0.0f;
@@ -157,24 +155,28 @@ void gimbal_task_func(void const * argument) {
                 float mouse_x = (float)rc->mouse.x * MOUSE_YAW_SENS;
                 float mouse_y = (float)rc->mouse.y * MOUSE_PIT_SENS;
 
-                world_pit_target += (ry * RC_PIT_SENS) + mouse_y;
+                world_pit_target -= (ry * RC_PIT_SENS) - mouse_y;
                 world_yaw_target -= (rx * RC_YAW_SENS) + mouse_x;
 
             } else if (robot_ctrl.gimbal_mode == GIMBAL_AUTO) {
 
-
-                // 自瞄模式：
-
-                // 此处自瞄解算逻辑...
-
-
+                target_info_t target_info;
+                if (parse_target_data(&target_info) == 1) {
+                    LED_BLUE_RESET();
+                    world_yaw_target = target_info.aim_target_yaw;
+                    world_pit_target = target_info.aim_target_pitch;
+                }
+                else {
+                    LED_BLUE_SET();
+                }
             }
 
             float cur_yaw, cur_pit;
             yaw_m->get_status(yaw_m, "POS", &cur_yaw);
             pit_m->get_status(pit_m, "POS", &cur_pit);
 
-            float yaw_out = cur_yaw + Rad_Format(world_yaw_target - robot_ctrl.gimbal.yaw + robot_ctrl.chassis.yaw_speed);
+            //float yaw_out = cur_yaw + Rad_Format(world_yaw_target - robot_ctrl.gimbal.yaw + robot_ctrl.chassis.yaw_speed);
+            float yaw_out = cur_yaw + Rad_Format(world_yaw_target - robot_ctrl.gimbal.yaw);
             float pit_out = cur_pit + (world_pit_target - robot_ctrl.gimbal.pitch);
 
             // 俯仰角限幅
@@ -186,8 +188,6 @@ void gimbal_task_func(void const * argument) {
             pit_m->set_target(pit_m, 1, pit_out);
         }
         else if (robot_ctrl.monitor.remote_online && robot_ctrl.gimbal_mode == GIMBAL_RELAX) {
-            //已连接但失能：红灯常亮
-            LED_GREEN_RESET(); LED_BLUE_RESET(); LED_RED_SET();
         }
 
         if (robot_ctrl.monitor.remote_online && robot_ctrl.shoot_mode == SHOOT_READY) {

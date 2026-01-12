@@ -4,6 +4,7 @@
 #include "../Algorithm/MahonyAHRS/MahonyAHRS.h"
 #include "math.h"
 #include "cmsis_os.h"
+#include "../../Application/auto_aim.h"
 
 // 姿态解算中间变量
 static fp32 INS_q[4] = {1.0f, 0.0f, 0.0f, 0.0f};
@@ -16,6 +17,11 @@ static uint16_t cali_count = 0;
 #define CALI_SAMPLES 1000                       // 校准采样次数 (500ms)
 
 void sensor_task_func(void const * argument) {
+
+    // 与上位机通信USB
+    struct usb_device *Usb = usb_get_device();
+    Usb->Init(Usb);
+
     // 1. 硬件初始化
     while (BMI088_init() != 0) {
         vTaskDelay(pdMS_TO_TICKS(10));
@@ -67,6 +73,10 @@ void sensor_task_func(void const * argument) {
         // 同步角速度反馈 (直接给 PID 使用经过消偏后的数据)
         robot_ctrl.gimbal.yaw_v   = gyro[2];
         robot_ctrl.gimbal.pitch_v = gyro[1];
+
+        Usb->Print(Usb, "%.3f,%.3f,%.3f,%.3f\r\n", INS_q[0], INS_q[1], INS_q[2], INS_q[3]);
+
+
 
         vTaskDelay(1);
     }
