@@ -132,6 +132,7 @@ void HAL_CAN_MspInit(CAN_HandleTypeDef* canHandle)
   {
   /* USER CODE BEGIN CAN2_MspInit 0 */
 
+
   /* USER CODE END CAN2_MspInit 0 */
     /* CAN2 clock enable */
     __HAL_RCC_CAN2_CLK_ENABLE();

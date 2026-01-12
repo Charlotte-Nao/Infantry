@@ -114,12 +114,12 @@ void chassis_task_func(void const * argument) {
                     // Shift 加速逻辑
                     float speed_ratio = (rc->key.v & KEY_SHIFT) ? 1.0f : 0.5f;
 
-                    if (rc->key.v & KEY_W) vx_kb += speed_ratio;
-                    if (rc->key.v & KEY_S) vx_kb -= speed_ratio;
-                    if (rc->key.v & KEY_A) vy_kb += speed_ratio;
-                    if (rc->key.v & KEY_D) vy_kb -= speed_ratio;
-                    if (rc->key.v & KEY_Q) vw_kb += 0.5f; // 手动左旋
-                    if (rc->key.v & KEY_E) vw_kb -= 0.5f; // 手动右旋
+                    if (rc->key.v & KEY_W) vy_kb += speed_ratio;
+                    if (rc->key.v & KEY_S) vy_kb -= speed_ratio;
+                    if (rc->key.v & KEY_A) vx_kb -= speed_ratio;
+                    if (rc->key.v & KEY_D) vx_kb += speed_ratio;
+                    if (rc->key.v & KEY_Q) vw_kb -= 0.5f; // 手动左旋
+                    if (rc->key.v & KEY_E) vw_kb += 0.5f; // 手动右旋
 
                     float total_vx = vx_rc + vx_kb;
                     float total_vy = vy_rc + vy_kb;
