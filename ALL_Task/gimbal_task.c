@@ -12,6 +12,7 @@
 #include "../../Bsp/uart/bsp_uart.h"
 #include "../../Bsp/led/bsp_led.h"
 #include "../../Components/remote/remote.h"
+#include "../../Application/auto_aim.h"
 
 
 #define RC_DEADZONE         10
@@ -49,6 +50,11 @@ void gimbal_task_func(void const * argument) {
     struct motor_device *shoot_l = motor_get_device("M3508_SHOOT_L");
     struct motor_device *shoot_r = motor_get_device("M3508_SHOOT_R");
     struct motor_device *stir_m  = motor_get_device("M2006_TRIGGER");
+
+    // 与上位机通信USB
+    struct usb_device* usb = usb_get_device();
+    usb->Init(usb);
+    auto_aim_init(usb);
 
     // 获取控制设别句柄
     const RC_ctrl_t *rc = robot_ctrl.rc;
@@ -157,17 +163,22 @@ void gimbal_task_func(void const * argument) {
                 float mouse_x = (float)rc->mouse.x * MOUSE_YAW_SENS;
                 float mouse_y = (float)rc->mouse.y * MOUSE_PIT_SENS;
 
-                world_pit_target += (ry * RC_PIT_SENS) + mouse_y;
+                world_pit_target -= (ry * RC_PIT_SENS) - mouse_y;
                 world_yaw_target -= (rx * RC_YAW_SENS) + mouse_x;
 
-            } else if (robot_ctrl.gimbal_mode == GIMBAL_AUTO) {
+            }
+            else if (robot_ctrl.gimbal_mode == GIMBAL_AUTO) {
+                target_info_t target_info;
 
+                if (parse_target_data(&target_info) == 1) {
 
-                // 自瞄模式：
-
-                // 此处自瞄解算逻辑...
-
-
+                    LED_BLUE_RESET();
+                    world_yaw_target = target_info.aim_target_yaw;
+                    world_pit_target = target_info.aim_target_pitch;
+                }
+                else {
+                    LED_BLUE_SET();
+                }
             }
 
             float cur_yaw, cur_pit;
@@ -175,7 +186,7 @@ void gimbal_task_func(void const * argument) {
             pit_m->get_status(pit_m, "POS", &cur_pit);
 
             float yaw_out = cur_yaw + Rad_Format(world_yaw_target - robot_ctrl.gimbal.yaw + robot_ctrl.chassis.yaw_speed);
-            float pit_out = cur_pit + (world_pit_target - robot_ctrl.gimbal.pitch);
+            float pit_out = cur_pit - (world_pit_target - robot_ctrl.gimbal.pitch);
 
             // 俯仰角限幅
             if (pit_out > 0.35f) pit_out = 0.35f;

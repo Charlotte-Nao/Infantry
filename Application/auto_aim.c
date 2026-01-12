@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <stdio.h>
+#include "../../Bsp/LED/bsp_LED.h"
 
 // 全局变量
 static struct uart_device *auto_aim_uart = NULL;
@@ -13,10 +14,6 @@ int auto_aim_init(struct usb_device *usb_dev) {
     if (usb_dev == NULL) {
         return -1;
     }
-
-    //auto_aim_uart
-    //
-    //= uart_dev;
     auto_aim_usb = usb_dev;
 
     return 0;
@@ -25,8 +22,8 @@ int auto_aim_init(struct usb_device *usb_dev) {
 // 解析目标数据
 
 int parse_target_data(target_info_t *target) {
+
     char buffer[100];
-    //int received_len = auto_aim_uart->Recv(auto_aim_uart, buffer, sizeof(buffer) - 1, 200);
     int received_len = auto_aim_usb->Recv(auto_aim_usb, buffer, sizeof(buffer) - 1, 200);
 
     if (received_len > 0) {
@@ -47,7 +44,7 @@ int parse_target_data(target_info_t *target) {
         if (!token) return -1;
         target->aim_target_pitch = strtof(token, NULL);
 
-        //auto_aim_uart->Print(auto_aim_uart, "%d\r\n", is_target_valid(target));
+        //auto_aim_usb->Print(auto_aim_uart, "%d\r\n", is_target_valid(target));
         return is_target_valid(target);
     }
 

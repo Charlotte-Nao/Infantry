@@ -114,7 +114,7 @@ void MX_FREERTOS_Init(void) {
   defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
 
   /* definition and creation of sensor_task */
-  osThreadDef(sensor_task, sensor_task_func, osPriorityHigh, 0, 128);
+  osThreadDef(sensor_task, sensor_task_func, osPriorityHigh, 0, 512);
   sensor_taskHandle = osThreadCreate(osThread(sensor_task), NULL);
 
   /* definition and creation of motor_task */
