@@ -74,7 +74,7 @@ void sensor_task_func(void const * argument) {
         robot_ctrl.gimbal.yaw_v   = gyro[2];
         robot_ctrl.gimbal.pitch_v = gyro[1];
 
-        Usb->Print(Usb, "%.3f,%.3f,%.3f,%.3f\r\n", INS_q[0], INS_q[1], INS_q[2], INS_q[3]);
+        Usb->Print(Usb, "%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\r\n", INS_q[0], INS_q[1], INS_q[2], INS_q[3],robot_ctrl.gimbal.yaw,robot_ctrl.gimbal.pitch);
 
 
 
