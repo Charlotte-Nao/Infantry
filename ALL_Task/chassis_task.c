@@ -70,7 +70,8 @@ void chassis_task_func(void const * argument) {
         uint32_t current_tick = osKernelSysTick();
 
         /**************************************************************************************************************/
-        if (current_tick - rc->last_update_tick > 200) {
+        // 只修改：遥控器掉线检测 → VT13专属超时判定
+        if (current_tick - rc->vt13.last_update_tick > 200) {
             // 遥控器掉线保护
             robot_ctrl.monitor.remote_online = 0;
             robot_ctrl.chassis_mode = CHASSIS_RELAX;
@@ -79,7 +80,8 @@ void chassis_task_func(void const * argument) {
             /**********************************************************************************************************/
             // 底盘模式切换
             /* 输入抽象*/
-            uint8_t toggle_cmd = (rc->key.v & KEY_CTRL) || rc->rc.custom_r;
+            // 只修改：CTRL键盘按键+自定义右键 → VT13专属按键
+            uint8_t toggle_cmd = (rc->vt13.key_vt13.v & KEY_VT13_CTRL) || rc->vt13.rc_vt13.custom_r;
 
             /* 边缘检测 (上升沿触发切换) */
             uint8_t toggle_trigger = (toggle_cmd && !last_toggle_cmd);
@@ -106,20 +108,21 @@ void chassis_task_func(void const * argument) {
                     LED_GREEN_SET();
 
                     // --- A. 输入源融合 (遥控器摇杆 + 键盘) ---
-                    float vx_rc = (abs(rc->rc.ch[0]) > RC_DEADZONE) ? rc->rc.ch[0] / 660.0f : 0;
-                    float vy_rc = (abs(rc->rc.ch[1]) > RC_DEADZONE) ? rc->rc.ch[1] / 660.0f : 0;
-                    float vw_rc = (abs(rc->rc.wheel) > RC_DEADZONE) ? rc->rc.wheel / 660.0f : 0;
+                    // 只修改：右摇杆CH0/CH1 + 拨轮 → VT13专属通道
+                    float vx_rc = (abs(rc->vt13.rc_vt13.ch[0]) > RC_DEADZONE) ? rc->vt13.rc_vt13.ch[0] / 660.0f : 0;
+                    float vy_rc = (abs(rc->vt13.rc_vt13.ch[1]) > RC_DEADZONE) ? rc->vt13.rc_vt13.ch[1] / 660.0f : 0;
+                    float vw_rc = (abs(rc->vt13.rc_vt13.wheel) > RC_DEADZONE) ? rc->vt13.rc_vt13.wheel / 660.0f : 0;
 
                     float vx_kb = 0, vy_kb = 0, vw_kb = 0;
-                    // Shift 加速逻辑
-                    float speed_ratio = (rc->key.v & KEY_SHIFT) ? 1.0f : 0.5f;
+                    // 只修改：Shift变速+WASD+QE键盘 → VT13专属键盘按键
+                    float speed_ratio = (rc->vt13.key_vt13.v & KEY_VT13_SHIFT) ? 1.0f : 0.5f;
 
-                    if (rc->key.v & KEY_W) vy_kb += speed_ratio;
-                    if (rc->key.v & KEY_S) vy_kb -= speed_ratio;
-                    if (rc->key.v & KEY_A) vx_kb -= speed_ratio;
-                    if (rc->key.v & KEY_D) vx_kb += speed_ratio;
-                    if (rc->key.v & KEY_Q) vw_kb -= 0.5f; // 手动左旋
-                    if (rc->key.v & KEY_E) vw_kb += 0.5f; // 手动右旋
+                    if (rc->vt13.key_vt13.v & KEY_VT13_W) vy_kb += speed_ratio;
+                    if (rc->vt13.key_vt13.v & KEY_VT13_S) vy_kb -= speed_ratio;
+                    if (rc->vt13.key_vt13.v & KEY_VT13_A) vx_kb -= speed_ratio;
+                    if (rc->vt13.key_vt13.v & KEY_VT13_D) vx_kb += speed_ratio;
+                    if (rc->vt13.key_vt13.v & KEY_VT13_Q) vw_kb -= 0.5f; // 手动左旋
+                    if (rc->vt13.key_vt13.v & KEY_VT13_E) vw_kb += 0.5f; // 手动右旋
 
                     float total_vx = vx_rc + vx_kb;
                     float total_vy = vy_rc + vy_kb;
@@ -150,10 +153,10 @@ void chassis_task_func(void const * argument) {
                     float final_vy = total_vx * sinf(angle_error) + total_vy * cosf(angle_error);
 
                     // --- E. 逆运动学计算 ---
-                    wheel_targets[0] = (-final_vx - final_vy - vw_final) * MOTOR_RPM_TO_VECTOR;
-                    wheel_targets[1] = (-final_vx + final_vy - vw_final) * MOTOR_RPM_TO_VECTOR;
-                    wheel_targets[2] = (final_vx + final_vy - vw_final) * MOTOR_RPM_TO_VECTOR;
-                    wheel_targets[3] = (final_vx - final_vy - vw_final) * MOTOR_RPM_TO_VECTOR;
+                    wheel_targets[0] = (final_vx + final_vy - vw_final) * MOTOR_RPM_TO_VECTOR;
+                    wheel_targets[1] = (final_vx - final_vy - vw_final) * MOTOR_RPM_TO_VECTOR;
+                    wheel_targets[2] = (-final_vx - final_vy - vw_final) * MOTOR_RPM_TO_VECTOR;
+                    wheel_targets[3] = (-final_vx + final_vy - vw_final) * MOTOR_RPM_TO_VECTOR;
 
                     for (int i = 0; i < 4; i++) {
                         if (chassis[i]) chassis[i]->set_target(chassis[i], 1, wheel_targets[i]);
@@ -173,7 +176,6 @@ void chassis_task_func(void const * argument) {
             LED_RED_Toggle();
             osDelay(100);
         }
-
 
         osDelay(2);
     }

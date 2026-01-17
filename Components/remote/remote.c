@@ -1,20 +1,27 @@
 #include "remote.h"
-
 #include "cmsis_os.h"
 #include "usart.h"
 #include "string.h"
-
-
 #include "../../Bsp/LED/bsp_LED.h"
 
-/* 声明外部句柄，请确保 CubeMX 中 USART6 和 DMA 已配置 */
-extern UART_HandleTypeDef huart6;
+/******************************************************************************************
+ *                                   外设句柄声明 (原文件保留)
+ ******************************************************************************************/
+extern UART_HandleTypeDef huart3;  // DT7 -> USART3
+extern DMA_HandleTypeDef hdma_usart3_rx;
+extern UART_HandleTypeDef huart6;  // VT13 -> USART6
 extern DMA_HandleTypeDef hdma_usart6_rx;
 
-static uint8_t rc_rx_buf[2][RC_RX_BUF_SIZE]; // DMA 双缓冲区
-RC_ctrl_t remote_ctrl;                       // 映射后的逻辑数据
+/******************************************************************************************
+ *                                   双缓冲区定义 (独立分配，互不干扰)
+ ******************************************************************************************/
+static uint8_t sbus_rx_buf[2][SBUS_RX_BUF_NUM_DT7];  // DT7 DMA双缓冲区
+static uint8_t rc_rx_buf[2][RC_RX_BUF_SIZE_VT13];    // VT13 DMA双缓冲区
+static RC_ctrl_t remote_ctrl;                        // 合并后的总遥控器数据，全局唯一
 
-/* --- 官方 CRC16 校验表 --- */
+/******************************************************************************************
+ *                                   VT13 官方 CRC16 校验表 (原VT13保留)
+ ******************************************************************************************/
 static const uint16_t crc16_tab[256] = {
     0x0000, 0x1189, 0x2312, 0x329b, 0x4624, 0x57ad, 0x6536, 0x74bf,
     0x8c48, 0x9dc1, 0xaf5a, 0xbed3, 0xca6c, 0xdbe5, 0xe97e, 0xf8f7,
@@ -50,9 +57,9 @@ static const uint16_t crc16_tab[256] = {
     0x7bc7, 0x6a4e, 0x58d5, 0x495c, 0x3de3, 0x2c6a, 0x1ef1, 0x0f78
 };
 
-/**
- * @brief CRC16 校验计算
- */
+/******************************************************************************************
+ *                                   VT13 CRC16校验 (原VT13保留)
+ ******************************************************************************************/
 static uint16_t RC_CRC16_Check(uint8_t *p_msg, uint16_t len)
 {
     uint16_t crc16 = 0xFFFF;
@@ -63,50 +70,121 @@ static uint16_t RC_CRC16_Check(uint8_t *p_msg, uint16_t len)
     return crc16;
 }
 
-/**
- * @brief 遥控器数据解析
- * @param p_frame 接收到的 21 字节原始数据包
- */
-static void RC_Data_Parse(volatile const uint8_t *p_frame)
+/******************************************************************************************
+ *                                   DT7 数据解析 (原DT7保留，适配新结构体)
+ ******************************************************************************************/
+static void sbus_to_rc(volatile const uint8_t *sbus_buf, RC_dt7_t *rc_dt7)
+{
+    if (sbus_buf == NULL || rc_dt7 == NULL) return;
+
+    rc_dt7->rc_dt7.ch[0] = (sbus_buf[0] | (sbus_buf[1] << 8)) & 0x07ff;
+    rc_dt7->rc_dt7.ch[1] = ((sbus_buf[1] >> 3) | (sbus_buf[2] << 5)) & 0x07ff;
+    rc_dt7->rc_dt7.ch[2] = ((sbus_buf[2] >> 6) | (sbus_buf[3] << 2) | (sbus_buf[4] << 10)) &0x07ff;
+    rc_dt7->rc_dt7.ch[3] = ((sbus_buf[4] >> 1) | (sbus_buf[5] << 7)) & 0x07ff;
+    rc_dt7->rc_dt7.sw_l = ((sbus_buf[5] >> 4) & 0x0003);
+    rc_dt7->rc_dt7.sw_r = ((sbus_buf[5] >> 4) & 0x000C) >> 2;
+    rc_dt7->mouse_dt7.x = sbus_buf[6] | (sbus_buf[7] << 8);
+    rc_dt7->mouse_dt7.y = sbus_buf[8] | (sbus_buf[9] << 8);
+    rc_dt7->mouse_dt7.z = sbus_buf[10] | (sbus_buf[11] << 8);
+    rc_dt7->mouse_dt7.press_l = sbus_buf[12];
+    rc_dt7->mouse_dt7.press_r = sbus_buf[13];
+    rc_dt7->key_dt7.v = sbus_buf[14] | (sbus_buf[15] << 8);
+    rc_dt7->rc_dt7.wheel = sbus_buf[16] | (sbus_buf[17] << 8);
+
+    // 归一化到 [-660,660]
+    rc_dt7->rc_dt7.ch[0] -= RC_CH_VALUE_OFFSET_DT7;
+    rc_dt7->rc_dt7.ch[1] -= RC_CH_VALUE_OFFSET_DT7;
+    rc_dt7->rc_dt7.ch[2] -= RC_CH_VALUE_OFFSET_DT7;
+    rc_dt7->rc_dt7.ch[3] -= RC_CH_VALUE_OFFSET_DT7;
+    rc_dt7->rc_dt7.ch[4] -= RC_CH_VALUE_OFFSET_DT7;
+
+    rc_dt7->last_update_tick = osKernelSysTick();
+}
+
+/******************************************************************************************
+ *                                   VT13 数据解析 (原VT13保留，适配新结构体)
+ ******************************************************************************************/
+static void RC_Data_Parse(volatile const uint8_t *p_frame, RC_vt13_t *rc_vt13)
 {
     remote_raw_t *raw = (remote_raw_t *)p_frame;
 
-    //基础校验 (帧头 + CRC)
     if (raw->sof_1 != 0xA9 || raw->sof_2 != 0x53) return;
-    if (RC_CRC16_Check((uint8_t *)p_frame, RC_FRAME_LENGTH - 2) != raw->crc16) return;
+    if (RC_CRC16_Check((uint8_t *)p_frame, RC_FRAME_LENGTH_VT13 - 2) != raw->crc16) return;
 
-    // 1. 映射遥控器摇杆与拨轮
-    remote_ctrl.rc.ch[0] = (int16_t)raw->ch_0 - RC_CH_VALUE_OFFSET;
-    remote_ctrl.rc.ch[1] = (int16_t)raw->ch_1 - RC_CH_VALUE_OFFSET;
-    remote_ctrl.rc.ch[2] = (int16_t)raw->ch_2 - RC_CH_VALUE_OFFSET;
-    remote_ctrl.rc.ch[3] = (int16_t)raw->ch_3 - RC_CH_VALUE_OFFSET;
-    remote_ctrl.rc.wheel = (int16_t)raw->wheel - RC_CH_VALUE_OFFSET;
+    // 映射摇杆与拨轮
+    rc_vt13->rc_vt13.ch[0] = (int16_t)raw->ch_0 - RC_CH_VALUE_OFFSET_VT13;
+    rc_vt13->rc_vt13.ch[1] = (int16_t)raw->ch_1 - RC_CH_VALUE_OFFSET_VT13;
+    rc_vt13->rc_vt13.ch[2] = (int16_t)raw->ch_2 - RC_CH_VALUE_OFFSET_VT13;
+    rc_vt13->rc_vt13.ch[3] = (int16_t)raw->ch_3 - RC_CH_VALUE_OFFSET_VT13;
+    rc_vt13->rc_vt13.wheel = (int16_t)raw->wheel - RC_CH_VALUE_OFFSET_VT13;
 
-    // 2. 映射遥控器按键与挡位
-    remote_ctrl.rc.sw       = (uint8_t)raw->mode_sw;
-    remote_ctrl.rc.pause    = (uint8_t)raw->btn_pause;
-    remote_ctrl.rc.custom_l = (uint8_t)raw->btn_custom_l;
-    remote_ctrl.rc.custom_r = (uint8_t)raw->btn_custom_r;
-    remote_ctrl.rc.trigger  = (uint8_t)raw->btn_trigger;
+    // 映射按键与挡位
+    rc_vt13->rc_vt13.sw       = (uint8_t)raw->mode_sw;
+    rc_vt13->rc_vt13.pause    = (uint8_t)raw->btn_pause;
+    rc_vt13->rc_vt13.custom_l = (uint8_t)raw->btn_custom_l;
+    rc_vt13->rc_vt13.custom_r = (uint8_t)raw->btn_custom_r;
+    rc_vt13->rc_vt13.trigger  = (uint8_t)raw->btn_trigger;
 
-    // 3. 映射鼠标
-    remote_ctrl.mouse.x = raw->mouse_x;
-    remote_ctrl.mouse.y = raw->mouse_y;
-    remote_ctrl.mouse.z = raw->mouse_z;
-    remote_ctrl.mouse.press_l = (uint8_t)raw->mouse_left;
-    remote_ctrl.mouse.press_r = (uint8_t)raw->mouse_right;
-    remote_ctrl.mouse.press_m = (uint8_t)raw->mouse_middle;
+    // 映射鼠标
+    rc_vt13->mouse_vt13.x = raw->mouse_x;
+    rc_vt13->mouse_vt13.y = raw->mouse_y;
+    rc_vt13->mouse_vt13.z = raw->mouse_z;
+    rc_vt13->mouse_vt13.press_l = (uint8_t)raw->mouse_left;
+    rc_vt13->mouse_vt13.press_r = (uint8_t)raw->mouse_right;
+    rc_vt13->mouse_vt13.press_m = (uint8_t)raw->mouse_middle;
 
-    // 4. 映射键盘
-    remote_ctrl.key.v = raw->key_v;
+    // 映射键盘
+    rc_vt13->key_vt13.v = raw->key_v;
 
-    remote_ctrl.last_update_tick = osKernelSysTick();
+    rc_vt13->last_update_tick = osKernelSysTick();
 }
 
-/**
- * @brief USART6 中断服务函数
- * 需在 stm32xxxx_it.c 中调用或直接定义
- */
+/******************************************************************************************
+ *                                   DT7 串口中断服务函数 USART3_IRQHandler (原DT7保留)
+ ******************************************************************************************/
+void USART3_IRQHandler(void)
+{
+    if(huart3.Instance->SR & UART_FLAG_RXNE)
+    {
+        __HAL_UART_CLEAR_PEFLAG(&huart3);
+    }
+    else if(USART3->SR & UART_FLAG_IDLE)
+    {
+        static uint16_t this_time_rx_len = 0;
+        __HAL_UART_CLEAR_PEFLAG(&huart3);
+
+        if ((hdma_usart3_rx.Instance->CR & DMA_SxCR_CT) == RESET)
+        {
+            __HAL_DMA_DISABLE(&hdma_usart3_rx);
+            this_time_rx_len = SBUS_RX_BUF_NUM_DT7 - hdma_usart3_rx.Instance->NDTR;
+            hdma_usart3_rx.Instance->NDTR = SBUS_RX_BUF_NUM_DT7;
+            hdma_usart3_rx.Instance->CR |= DMA_SxCR_CT;
+            __HAL_DMA_ENABLE(&hdma_usart3_rx);
+
+            if(this_time_rx_len == RC_FRAME_LENGTH_DT7)
+            {
+                sbus_to_rc(sbus_rx_buf[0], &remote_ctrl.dt7);
+            }
+        }
+        else
+        {
+            __HAL_DMA_DISABLE(&hdma_usart3_rx);
+            this_time_rx_len = SBUS_RX_BUF_NUM_DT7 - hdma_usart3_rx.Instance->NDTR;
+            hdma_usart3_rx.Instance->NDTR = SBUS_RX_BUF_NUM_DT7;
+            DMA1_Stream1->CR &= ~(DMA_SxCR_CT);
+            __HAL_DMA_ENABLE(&hdma_usart3_rx);
+
+            if(this_time_rx_len == RC_FRAME_LENGTH_DT7)
+            {
+                sbus_to_rc(sbus_rx_buf[1], &remote_ctrl.dt7);
+            }
+        }
+    }
+}
+
+/******************************************************************************************
+ *                                   VT13 串口中断服务函数 USART6_IRQHandler (原VT13保留)
+ ******************************************************************************************/
 void USART6_IRQHandler(void)
 {
     if (huart6.Instance->SR & UART_FLAG_IDLE)
@@ -114,48 +192,79 @@ void USART6_IRQHandler(void)
         __HAL_UART_CLEAR_IDLEFLAG(&huart6);
 
         uint16_t rx_len;
-        // 检查当前 DMA 正在向哪个 Memory 写入
         uint8_t current_mem = (hdma_usart6_rx.Instance->CR & DMA_SxCR_CT) ? 1 : 0;
 
-        // 停止 DMA 以重置计数器
         __HAL_DMA_DISABLE(&hdma_usart6_rx);
-        rx_len = RC_RX_BUF_SIZE - hdma_usart6_rx.Instance->NDTR;
-        hdma_usart6_rx.Instance->NDTR = RC_RX_BUF_SIZE;
+        rx_len = RC_RX_BUF_SIZE_VT13 - hdma_usart6_rx.Instance->NDTR;
+        hdma_usart6_rx.Instance->NDTR = RC_RX_BUF_SIZE_VT13;
 
-        // 切换缓冲区目标
         if (current_mem == 0) hdma_usart6_rx.Instance->CR |= DMA_SxCR_CT;
         else hdma_usart6_rx.Instance->CR &= ~DMA_SxCR_CT;
 
         __HAL_DMA_ENABLE(&hdma_usart6_rx);
 
-        // 只有长度匹配才解析 (21字节)
-        if (rx_len == RC_FRAME_LENGTH)
+        if (rx_len == RC_FRAME_LENGTH_VT13)
         {
-            RC_Data_Parse(rc_rx_buf[current_mem]);
+            RC_Data_Parse(rc_rx_buf[current_mem], &remote_ctrl.vt13);
         }
     }
 }
 
-/**
- * @brief 遥控器接收初始化 (USART6 + DMA 双缓冲)
- */
-void RC_Init(void)
+/******************************************************************************************
+ *                                   DT7 初始化
+ ******************************************************************************************/
+void RC_Init_DT7(void)
 {
-    // 使能串口 DMA 接收和空闲中断
+    SET_BIT(huart3.Instance->CR3, USART_CR3_DMAR);
+    __HAL_UART_ENABLE_IT(&huart3, UART_IT_IDLE);
+    __HAL_DMA_DISABLE(&hdma_usart3_rx);
+    while(hdma_usart3_rx.Instance->CR & DMA_SxCR_EN)
+    {
+        __HAL_DMA_DISABLE(&hdma_usart3_rx);
+    }
+    hdma_usart3_rx.Instance->PAR = (uint32_t) & (USART3->DR);
+    hdma_usart3_rx.Instance->M0AR = (uint32_t)(sbus_rx_buf[0]);
+    hdma_usart3_rx.Instance->M1AR = (uint32_t)(sbus_rx_buf[1]);
+    hdma_usart3_rx.Instance->NDTR = SBUS_RX_BUF_NUM_DT7;
+    SET_BIT(hdma_usart3_rx.Instance->CR, DMA_SxCR_DBM);
+    __HAL_DMA_ENABLE(&hdma_usart3_rx);
+}
+
+/******************************************************************************************
+ *                                   VT13 初始化
+ ******************************************************************************************/
+void RC_Init_VT13(void)
+{
     SET_BIT(huart6.Instance->CR3, USART_CR3_DMAR);
     __HAL_UART_ENABLE_IT(&huart6, UART_IT_IDLE);
-
-    // 配置 DMA
     __HAL_DMA_DISABLE(&hdma_usart6_rx);
     hdma_usart6_rx.Instance->PAR = (uint32_t) & (USART6->DR);
     hdma_usart6_rx.Instance->M0AR = (uint32_t)(rc_rx_buf[0]);
     hdma_usart6_rx.Instance->M1AR = (uint32_t)(rc_rx_buf[1]);
-    hdma_usart6_rx.Instance->NDTR = RC_RX_BUF_SIZE;
-
-    // 开启双缓冲模式
+    hdma_usart6_rx.Instance->NDTR = RC_RX_BUF_SIZE_VT13;
     SET_BIT(hdma_usart6_rx.Instance->CR, DMA_SxCR_DBM);
     __HAL_DMA_ENABLE(&hdma_usart6_rx);
 }
 
-void RC_Unable(void) { __HAL_UART_DISABLE(&huart6); }
-const RC_ctrl_t *RC_Get_Handle(void) { return &remote_ctrl; }
+/******************************************************************************************
+ *                                   一键初始化双遥控器
+ ******************************************************************************************/
+void RC_Init(void)
+{
+    RC_Init_DT7();
+    RC_Init_VT13();
+}
+
+/******************************************************************************************
+ *                                   禁用函数
+ ******************************************************************************************/
+void RC_Unable_DT7(void)  { __HAL_UART_DISABLE(&huart3); }
+void RC_Unable_VT13(void) { __HAL_UART_DISABLE(&huart6); }
+
+/******************************************************************************************
+ *                                   获取总遥控器句柄 (核心！给上层调用)
+ ******************************************************************************************/
+const RC_ctrl_t *RC_Get_Handle(void)
+{
+    return &remote_ctrl;
+}

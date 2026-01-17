@@ -22,6 +22,9 @@ void sensor_task_func(void const * argument) {
     struct usb_device *Usb = usb_get_device();
     Usb->Init(Usb);
 
+    struct uart_device* Uart = uart_get_device("uart1_dma");
+    Uart->Init(Uart, 115200, 8, 'N', 1);
+
     // 1. 硬件初始化
     while (BMI088_init() != 0) {
         vTaskDelay(pdMS_TO_TICKS(10));
@@ -76,7 +79,7 @@ void sensor_task_func(void const * argument) {
 
         Usb->Print(Usb, "%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\r\n", INS_q[0], INS_q[1], INS_q[2], INS_q[3],robot_ctrl.gimbal.yaw,robot_ctrl.gimbal.pitch);
 
-
+        //Uart->Print(Uart,"%d\r\n", robot_ctrl.rc->dt7.rc_dt7.ch[0]);
 
         vTaskDelay(1);
     }
