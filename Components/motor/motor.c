@@ -788,6 +788,7 @@ struct GM6020_data {
     // 目标量
     float   _p_des;          // 目标位置 (rad)
     float   _v_des_internal; // 内部速度目标 (位置环输出)
+    float   _v_des;          // 目标速度 (rpm)
     int16_t _out_output;     // 最终电压输出 (-30000 ~ 30000)
 
     // 位置环 PID (外环)
@@ -805,6 +806,9 @@ struct GM6020_data {
     float _last_d_out;
     float _d_filter_alpha;
     int16_t _last_v_error;
+
+    // 独立速度前馈
+    float _kp_v_only;
 
     // 反馈量
     int16_t POS;             // 机械角度 (0 ~ 8191)
@@ -857,6 +861,8 @@ void GM6020_PV_init(struct motor_device *motor, uint32_t motor_ID, CAN_HandleTyp
         if (para_num >= 7) d->_v_limit = (float)va_arg(ap, double);
         if (para_num >= 8) d->_d_filter_alpha = (float)va_arg(ap, double);
 
+        if (para_num >= 9) d->_kp_v_only = (float)va_arg(ap, double);
+
         va_end(ap);
     }
 }
@@ -888,6 +894,7 @@ void GM6020_disable(struct motor_device *motor) {
     d->_p_des = (float)d->POS * GM6020_ANGLE_TO_RAD;
 }
 
+// 纯速度位置环
 void GM6020_PV_update(struct motor_device *motor) {
     if (motor == NULL || motor->motor_data == NULL) return;
     struct GM6020_data *d = (struct GM6020_data *)motor->motor_data;
@@ -941,12 +948,70 @@ void GM6020_PV_update(struct motor_device *motor) {
     d->_out_output = (int16_t)total_out;
 }
 
+// 速度位置环 并 速度环
+void GM6020_PV_V_update(struct motor_device *motor) {
+    if (motor == NULL || motor->motor_data == NULL) return;
+    struct GM6020_data *d = (struct GM6020_data *)motor->motor_data;
+
+    if (d->enable_flag == 0) {
+        d->_i_term_p = 0.0f;
+        d->_i_term_v = 0.0f;
+        d->_out_output = 0;
+        // 持续同步目标值
+        d->_p_des = (float)d->POS * GM6020_ANGLE_TO_RAD;
+        return;
+    }
+
+    // 1. 位置环计算
+    float current_p_rad = (float)d->POS * GM6020_ANGLE_TO_RAD;
+    float p_error = d->_p_des - current_p_rad;
+
+    // 最短路径处理
+    while (p_error > M_PI)  p_error -= 2.0f * M_PI;
+    while (p_error < -M_PI) p_error += 2.0f * M_PI;
+
+    d->_i_term_p += d->_ki_p * p_error;
+    if (d->_i_term_p > d->_i_p_max) d->_i_term_p = d->_i_p_max;
+    if (d->_i_term_p < -d->_i_p_max) d->_i_term_p = -d->_i_p_max;
+
+    d->_v_des_internal = d->_kp_p * p_error + d->_i_term_p;
+
+    // 速度限制
+    if (d->_v_des_internal > d->_v_limit) d->_v_des_internal = d->_v_limit;
+    if (d->_v_des_internal < -d->_v_limit) d->_v_des_internal = -d->_v_limit;
+
+    // 2. 速度环计算
+    float v_error = d->_v_des_internal - (float)d->VEL;
+    float v_p_out = d->_kp_v * v_error;
+
+    d->_i_term_v += d->_ki_v * v_error;
+    if (d->_i_term_v > d->_i_v_max) d->_i_term_v = d->_i_v_max;
+    if (d->_i_term_v < -d->_i_v_max) d->_i_term_v = -d->_i_v_max;
+
+    float d_raw = d->_kd_v * (v_error - (float)d->_last_v_error);
+    float v_d_out = d->_d_filter_alpha * d_raw + (1.0f - d->_d_filter_alpha) * d->_last_d_out;
+
+    d->_last_v_error = (int16_t)v_error;
+    d->_last_d_out = v_d_out;
+
+    // 3. 纯速度环计算
+    float v_only_out = d->_v_des * d->_kp_v_only;
+
+    // 3. 输出限幅
+    float total_out = v_p_out + d->_i_term_v + v_d_out + v_only_out;
+    if (total_out > d->_out_max) total_out = d->_out_max;
+    if (total_out < -d->_out_max) total_out = -d->_out_max;
+
+    d->_out_output = (int16_t)total_out;
+}
+
 /* 设定目标 (rad) */
 void GM6020_PV_set_target(const struct motor_device *motor, const int para_num, ...) {
     if (motor == NULL || motor->motor_data == NULL) return;
     struct GM6020_data *d = (struct GM6020_data *)motor->motor_data;
     va_list ap; va_start(ap, para_num);
     if (para_num >= 1) d->_p_des = (float)va_arg(ap, double);
+    if (para_num >= 2) d->_v_des = (float)va_arg(ap, double);
     va_end(ap);
 }
 
@@ -1092,7 +1157,7 @@ struct motor_device GM6020_YAW = {
     .motor_data = &GM6020_YAW_data,
     .init = GM6020_PV_init,
     .get_measure = GM6020_get_measure,
-    .update = GM6020_PV_update,
+    .update = GM6020_PV_V_update,
     .send_ctrl_cmd = NULL,
     .send_disable_cmd = GM6020_disable,
     .send_enable_cmd = GM6020_enable,
@@ -1218,13 +1283,16 @@ static void All_Motors_Init(void) {
 
     // 4. GM6020 YAW轴 (位置-速度串级)
     // 参数含义: [ID, 句柄, 参数个数, P_Kp, P_Ki, V_Kp, V_Ki, V_Kd, Out_Max]
-    GM6020_YAW.init(&GM6020_YAW, 0x206, &hcan1, 6,
+    GM6020_YAW.init(&GM6020_YAW, 0x206, &hcan1, 9,
                     150.0,     /* P_Kp */
                     0.0,      /* P_Ki */
-                    200.0,    /* V_Kp */
+                    210.0,    /* V_Kp */
                     0.0,      /* V_Ki */
                     0.0,      /* V_Kd */
-                    25000.0   /* Out_Max */
+                    25000.0,   /* Out_Max */
+                    320.0,     /* V_Limit */
+                    1.0,      /* Alpha */
+                    300.0    /* V Only Kp */
     );
 
     // 5. 摩擦轮电机 M3508 (速度环)
