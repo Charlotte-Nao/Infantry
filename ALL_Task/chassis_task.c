@@ -15,11 +15,12 @@
 #define MOUSE_PIT_SENS          0.0002f  // 鼠标纵向灵敏度
 #define FOLLOW_P_GAIN           0.5f
 #define RC_DEADZONE             10
-#define YAW_CENTER_OFFSET       0.0f
+#define YAW_CENTER_OFFSET       0.003f
 
 // 底盘几何参数配置
 #define MOTOR_RPM_TO_VECTOR     3000.0f
-#define CHASSIS_MAX_RAD         60.0f
+#define CHASSIS_MAX_RAD         MOTOR_RPM_TO_VECTOR / 50.0f
+#define rotation_speed          1.0f      //底盘自转转速比例
 
 // 回正相关参数
 #define YAW_ALIGN_THRESHOLD     0.05f    // 放宽到位阈值（适配机械误差，约2.86度）
@@ -45,7 +46,8 @@ static float Rad_Format(float angle) {
     return angle;
 }
 
-void chassis_task_func(void const * argument) {
+void chassis_task_func(void const * argument)
+{
     /******************************************************************************************************************/
     /* 初始化 */
     struct uart_device* Uart = uart_get_device("uart1_dma");
@@ -161,51 +163,69 @@ void chassis_task_func(void const * argument) {
                     // 步骤4：优先级排序：手动控制 > 固定速度回正 > 正常跟随
                     float vw_final = 0;
                     if (current_manual_active) {
-                        // 手动控制阶段：关闭回正使能，优先响应输入
-                        yaw_align_enable = 0;
-                        vw_final = vw_rc + vw_kb;
-                    } else if (yaw_align_enable) {
-                        // 自动回正阶段：直接使用松开前保存的最后手动速度，固定速度回正
-                        vw_final = last_manual_vw;
+                        // 这部分用来加上手动控制情况下的速度的不规则自转
+                        // 具体处理逻辑为考虑采用曲线 y = 3t**2 - 2t**3 ,其中t为该阶段进行的进度，映射为（0,1）->(0,1)
+                        // 处理方法基本为，得到初始速度与时间后，规定周期，进度相反两方向运动，随后把周期映射到此
 
-                        // 回正到位判断，到位后清零所有标志和速度
-                        if (fabsf(angle_error) < YAW_ALIGN_THRESHOLD) {
+                        float raw_manual_vw = vw_rc + vw_kb;
+                        const uint32_t period_ms = 1000;
+                        float phase = (float)(current_tick % period_ms) / (float)period_ms;
+                        float linear_t = 0;
+                        if (phase < 0.5f)
+                            linear_t = phase * 2.0f;
+                        else linear_t = 2.0f - phase * 2.0f;
+                        float smooth_t = linear_t * linear_t * (3.0f - 2.0f * linear_t);
+                        float chaotic_factor = 0.6f + (0.4f * smooth_t);
+                        vw_final = raw_manual_vw * chaotic_factor;
+
+                        // 手动控制阶段：确保关闭自动回正使能，并实时保存带有扰动的最后有效速度
+                        // 注意：保存 last_manual_vw 用于后续回正逻辑的起点
+                        yaw_align_enable = 0;
+                        last_manual_vw = vw_final;
+
+                    } else if (yaw_align_enable) {
+                        //该部分用来处理回正逻辑，用来解决回正情况下的猛烈颤抖问题，大致方法仍然为变速曲线，在接近回正点时速度降低，曲线回正变慢
+                        //考虑采用绝对位置，即yaw_angle_error / 3.14来作为进度处理，并且考虑曲线y = 1.0 / (1.0 + np.exp(-60.0 * (x - 0.175)))
+
+                        double err_ratio = angle_error / 3.14 ;
+                        if (err_ratio > 1.0f) err_ratio = 1.0f;
+                        if (err_ratio < 0.03f || fabsf(angle_error) < YAW_ALIGN_THRESHOLD)
+                        {
                             yaw_align_enable = 0;
                             vw_final = 0;
-                            last_manual_vw = 0.0f;
+                            last_manual_vw = 0;
                         }
-                    } else {
-                        // 正常跟随阶段：原有的云台跟随逻辑
-                        vw_final = -angle_error * FOLLOW_P_GAIN;
-                    }
+                        double curve_factor = 0.8 * (1.0 / (1.0 + exp(-60.0 * (err_ratio - 0.175)))) + 0.2;
+                        vw_final = last_manual_vw * curve_factor;
 
-                    // 步骤5：更新上一帧状态记录（供下一帧边缘检测使用）
-                    last_wheel_active = current_wheel_active;
-                    last_qe_active = current_qe_active;
+                        // 步骤5：更新上一帧状态记录（供下一帧边缘检测使用）
+                        last_wheel_active = current_wheel_active;
+                        last_qe_active = current_qe_active;
 
-                    robot_ctrl.chassis.yaw_speed = vw_final * CHASSIS_MAX_RAD;
+                        robot_ctrl.chassis.yaw_speed = vw_final * CHASSIS_MAX_RAD;
 
-                    // --- D. 随动坐标系变换 ---
-                    float final_vx = total_vx * cosf(angle_error) - total_vy * sinf(angle_error);
-                    float final_vy = total_vx * sinf(angle_error) + total_vy * cosf(angle_error);
+                        // --- D. 随动坐标系变换 ---
+                        float final_vx = total_vx * cosf(angle_error) - total_vy * sinf(angle_error);
+                        float final_vy = total_vx * sinf(angle_error) + total_vy * cosf(angle_error);
 
-                    // --- E. 逆运动学计算 ---
-                    wheel_targets[0] = (final_vx + final_vy - vw_final) * MOTOR_RPM_TO_VECTOR;
-                    wheel_targets[1] = (final_vx - final_vy - vw_final) * MOTOR_RPM_TO_VECTOR;
-                    wheel_targets[2] = (-final_vx - final_vy - vw_final) * MOTOR_RPM_TO_VECTOR;
-                    wheel_targets[3] = (-final_vx + final_vy - vw_final) * MOTOR_RPM_TO_VECTOR;
+                        // --- E. 逆运动学计算 ---
+                        wheel_targets[0] = (final_vx + final_vy - vw_final) * MOTOR_RPM_TO_VECTOR;
+                        wheel_targets[1] = (final_vx - final_vy - vw_final) * MOTOR_RPM_TO_VECTOR;
+                        wheel_targets[2] = (-final_vx - final_vy - vw_final) * MOTOR_RPM_TO_VECTOR;
+                        wheel_targets[3] = (-final_vx + final_vy - vw_final) * MOTOR_RPM_TO_VECTOR;
 
-                    for (int i = 0; i < 4; i++) {
-                        if (chassis[i]) chassis[i]->set_target(chassis[i], 1, wheel_targets[i]);
+                        for (int i = 0; i < 4; i++) {
+                            if (chassis[i]) chassis[i]->set_target(chassis[i], 1, wheel_targets[i]);
+                        }
                     }
                 }
             }
-        }
-        else {
-            // 遥控器掉线：红灯快闪
-            osDelay(100);
-        }
+            else {
+                // 遥控器掉线：红灯快闪
+                osDelay(100);
+            }
 
-        osDelay(2);
+            osDelay(2);
+        }
     }
 }
