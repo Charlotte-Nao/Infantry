@@ -185,30 +185,31 @@ void USART3_IRQHandler(void)
 /******************************************************************************************
  *                                   VT13 串口中断服务函数 USART6_IRQHandler (原VT13保留)
  ******************************************************************************************/
-void USART6_IRQHandler(void)
-{
-    if (huart6.Instance->SR & UART_FLAG_IDLE)
-    {
-        __HAL_UART_CLEAR_IDLEFLAG(&huart6);
-
-        uint16_t rx_len;
-        uint8_t current_mem = (hdma_usart6_rx.Instance->CR & DMA_SxCR_CT) ? 1 : 0;
-
-        __HAL_DMA_DISABLE(&hdma_usart6_rx);
-        rx_len = RC_RX_BUF_SIZE_VT13 - hdma_usart6_rx.Instance->NDTR;
-        hdma_usart6_rx.Instance->NDTR = RC_RX_BUF_SIZE_VT13;
-
-        if (current_mem == 0) hdma_usart6_rx.Instance->CR |= DMA_SxCR_CT;
-        else hdma_usart6_rx.Instance->CR &= ~DMA_SxCR_CT;
-
-        __HAL_DMA_ENABLE(&hdma_usart6_rx);
-
-        if (rx_len == RC_FRAME_LENGTH_VT13)
-        {
-            RC_Data_Parse(rc_rx_buf[current_mem], &remote_ctrl.vt13);
-        }
-    }
-}
+//  现在空闲中断函数被裁判系统接收占用了喵
+// void USART6_IRQHandler(void)
+// {
+//     if (huart6.Instance->SR & UART_FLAG_IDLE)
+//     {
+//         __HAL_UART_CLEAR_IDLEFLAG(&huart6);
+//
+//         uint16_t rx_len;
+//         uint8_t current_mem = (hdma_usart6_rx.Instance->CR & DMA_SxCR_CT) ? 1 : 0;
+//
+//         __HAL_DMA_DISABLE(&hdma_usart6_rx);
+//         rx_len = RC_RX_BUF_SIZE_VT13 - hdma_usart6_rx.Instance->NDTR;
+//         hdma_usart6_rx.Instance->NDTR = RC_RX_BUF_SIZE_VT13;
+//
+//         if (current_mem == 0) hdma_usart6_rx.Instance->CR |= DMA_SxCR_CT;
+//         else hdma_usart6_rx.Instance->CR &= ~DMA_SxCR_CT;
+//
+//         __HAL_DMA_ENABLE(&hdma_usart6_rx);
+//
+//         if (rx_len == RC_FRAME_LENGTH_VT13)
+//         {
+//             RC_Data_Parse(rc_rx_buf[current_mem], &remote_ctrl.vt13);
+//         }
+//     }
+// }
 
 /******************************************************************************************
  *                                   DT7 初始化
@@ -233,18 +234,19 @@ void RC_Init_DT7(void)
 /******************************************************************************************
  *                                   VT13 初始化
  ******************************************************************************************/
-void RC_Init_VT13(void)
-{
-    SET_BIT(huart6.Instance->CR3, USART_CR3_DMAR);
-    __HAL_UART_ENABLE_IT(&huart6, UART_IT_IDLE);
-    __HAL_DMA_DISABLE(&hdma_usart6_rx);
-    hdma_usart6_rx.Instance->PAR = (uint32_t) & (USART6->DR);
-    hdma_usart6_rx.Instance->M0AR = (uint32_t)(rc_rx_buf[0]);
-    hdma_usart6_rx.Instance->M1AR = (uint32_t)(rc_rx_buf[1]);
-    hdma_usart6_rx.Instance->NDTR = RC_RX_BUF_SIZE_VT13;
-    SET_BIT(hdma_usart6_rx.Instance->CR, DMA_SxCR_DBM);
-    __HAL_DMA_ENABLE(&hdma_usart6_rx);
-}
+//把防止错误调用usart6
+// void RC_Init_VT13(void)
+// {
+//     SET_BIT(huart6.Instance->CR3, USART_CR3_DMAR);
+//     __HAL_UART_ENABLE_IT(&huart6, UART_IT_IDLE);
+//     __HAL_DMA_DISABLE(&hdma_usart6_rx);
+//     hdma_usart6_rx.Instance->PAR = (uint32_t) & (USART6->DR);
+//     hdma_usart6_rx.Instance->M0AR = (uint32_t)(rc_rx_buf[0]);
+//     hdma_usart6_rx.Instance->M1AR = (uint32_t)(rc_rx_buf[1]);
+//     hdma_usart6_rx.Instance->NDTR = RC_RX_BUF_SIZE_VT13;
+//     SET_BIT(hdma_usart6_rx.Instance->CR, DMA_SxCR_DBM);
+//     __HAL_DMA_ENABLE(&hdma_usart6_rx);
+// }
 
 /******************************************************************************************
  *                                   一键初始化双遥控器

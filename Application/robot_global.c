@@ -1,5 +1,6 @@
 #include "robot_global.h"
 #include "string.h"
+#include "../Components/referee/referee.h"
 
 /* 实例化全局控制变量 */
 robot_ctrl_info_t robot_ctrl;
@@ -17,7 +18,9 @@ void Robot_Global_Init(void) {
     robot_ctrl.chassis_mode = CHASSIS_RELAX;
     robot_ctrl.shoot_mode   = SHOOT_STOP;
 
-    RC_Init();
+    //现在串口初始化由裁判系统接管喵
+    // RC_Init();
+    Referee_Init();
 
     // 关联遥控器句柄 (需要确保 RC_get_handle 返回的是包含遥控器数据的静态指针)
     robot_ctrl.rc = RC_Get_Handle();

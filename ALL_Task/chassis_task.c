@@ -7,6 +7,7 @@
 #include "cmsis_os.h"
 #include "stdio.h"
 #include "../Bsp/LED/bsp_LED.h"
+#include "../Components/referee/referee.h"  // 【新增】引入裁判系统组件
 
 /* --- 逻辑常量与控制参数 --- */
 #define GIMBAL_YAW_SENS         0.010f
@@ -73,6 +74,23 @@ void chassis_task_func(void const * argument)
     // 主循环
     while (1) {
         uint32_t current_tick = osKernelSysTick();
+
+
+        // ==========================================================
+        // 【新增 1】裁判系统仪表盘打印 (每 500ms 打印一次)
+        // 函数内部自带限频锁，直接调用即可，绝对不会阻塞 RTOS
+        // ==========================================================
+        Referee_Debug_Print();
+
+        // ==========================================================
+        // 【新增 2】裁判系统 CAN 数据转发 (限制为 50Hz，即每 20ms 发送一次)
+        // ==========================================================
+        static uint32_t last_can_send_tick = 0;
+        if (current_tick - last_can_send_tick >= 20) {
+            Referee_CAN_Forward();
+            last_can_send_tick = current_tick;
+        }
+
 
         /**************************************************************************************************************/
         // 遥控器掉线检测
