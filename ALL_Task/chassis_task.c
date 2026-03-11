@@ -41,6 +41,8 @@ static uint8_t last_qe_active = 0;       // 上一帧Q/E是否激活
 static uint8_t yaw_align_enable = 0;     // 回正使能标志（1=需要回正，0=不需要）
 static float last_manual_vw = 0.0f;      // 保存「拨轮/Q/E」松开前的最后有效旋转速度（统一变量，避免冲突）
 
+uint16_t cnt = 0;
+
 static float Rad_Format(float angle) {
     while (angle >  M_PI) angle -= 2.0f * M_PI;
     while (angle < -M_PI) angle += 2.0f * M_PI;
@@ -81,16 +83,17 @@ void chassis_task_func(void const * argument) {
             if (uart1 != NULL) {
                 // 打印刚刚在 motor.c 中用移位法拼装好的数据
                 uart1->Print(uart1,
-                    "====== MAIN BOARD CAN RX TEST ======\r\n"
-                    "  > HP    : %d \r\n"
-                    "  > Heat  : %d \r\n"
-                    "  > Buffer: %d J \r\n"
-                    "  > Time  : %d s \r\n"
-                    "====================================\r\n\r\n",
-                    gateway_data.current_HP,
-                    gateway_data.shooter_17mm_barrel_heat,
-                    gateway_data.buffer_energy,
-                    gateway_data.stage_remain_time
+                "====== MAIN BOARD CAN RX TEST ======\r\n"
+                "  > cnt   : %d \r\n"
+                "  > RAW   : %02X %02X %02X %02X %02X %02X %02X %02X \r\n"
+                "  > HP    : %d \r\n"
+                "  > Buffer: %d J \r\n"
+                "====================================\r\n\r\n",
+                cnt,
+                can_test_raw[0], can_test_raw[1], can_test_raw[2], can_test_raw[3],
+                can_test_raw[4], can_test_raw[5], can_test_raw[6], can_test_raw[7],
+                gateway_data.current_HP,
+                gateway_data.buffer_energy
                 );
             }
             last_gateway_print_tick = current_tick;

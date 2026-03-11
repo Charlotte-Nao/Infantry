@@ -4,6 +4,7 @@
 /* 实例化全局控制变量 */
 robot_ctrl_info_t robot_ctrl;
 gateway_referee_t gateway_data;
+uint8_t can_test_raw[8] = {0}; // 【新增】
 
 /**
  * @brief 全局控制变量初始化
