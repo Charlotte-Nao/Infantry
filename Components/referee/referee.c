@@ -241,6 +241,10 @@ void Referee_Data_Parse(uint8_t *rx_buf, uint16_t len) {
                 memcpy(&referee_data.game_status, data_ptr, sizeof(ext_game_status_t));
                 break;
 
+            case 0x0101:
+                memcpy(&referee_data.place_status, data_ptr, sizeof(ext_place_status_t));
+                break;
+
             case 0x0201: // 机器人性能状态 (血量、上限等)
                 memcpy(&referee_data.robot_status, data_ptr, sizeof(ext_game_robot_status_t));
                 break;
@@ -251,6 +255,14 @@ void Referee_Data_Parse(uint8_t *rx_buf, uint16_t len) {
 
             case 0x0203: // 机器人绝对位置
                 memcpy(&referee_data.robot_pos, data_ptr, sizeof(ext_game_robot_pos_t));
+                break;
+
+            case 0x0206:
+                memcpy(&referee_data.huart_robot, data_ptr, sizeof(ext_huart_robot_data_t));
+                break;
+
+            case 0x0208:
+                memcpy(&referee_data.allow_robot, data_ptr, sizeof(ext_allow_robot_data_t));
                 break;
 
             default:
@@ -317,29 +329,35 @@ void Referee_Debug_Print(void) {
     if (osKernelSysTick() - last_print_tick > 500) {
         if (uart1 != NULL) {
             if (referee_data.last_update_tick != 0) {
+
+                // 提取场地状态的 bit23-24
+                uint8_t place_bits = (referee_data.place_status.place_t >> 23) & 0x03;
+
                 // 如果接收到了数据，打印多行仪表盘
                 uart1->Print(uart1,
-                    "========== REF DASHBOARD ==========\r\n"
-                    "[0x0001] Prog: %d | Time: %d s\r\n"
-                    "[0x0201] HP: %d/%d | HeatLim: %d\r\n"
-                    "[0x0202] Heat17: %d | Buf: %d J\r\n"
-                    "[0x0203] X: %.2f | Y: %.2f | Yaw: %.2f\r\n"
-                    "===================================\r\n\r\n",
-                    referee_data.game_status.game_progress,
-                    referee_data.game_status.stage_remain_time,
-                    referee_data.robot_status.current_HP,
-                    referee_data.robot_status.maximum_HP,
-                    referee_data.robot_status.shooter_barrel_heat_limit,
-                    referee_data.power_heat_data.shooter_17mm_barrel_heat,
-                    referee_data.power_heat_data.buffer_energy,
-                    referee_data.robot_pos.x,
-                    referee_data.robot_pos.y,
-                    referee_data.robot_pos.yaw
+                "========== REF GATEWAY DASHBOARD ==========\r\n"
+                "[Game] Prog: %d | Time: %d s | Place: %d\r\n"
+                "[Stat] HP: %d | Heat17: %d | Buf: %d J\r\n"
+                "[Cmbt] Allow17: %d | ArmorID: %d | Hurt: %d\r\n"
+                "-------------------------------------------\r\n"
+                "[Test] UART_Cnt: %d | Raw0-3: %02X %02X %02X %02X\r\n"
+                "===========================================\r\n\r\n",
+                referee_data.game_status.game_progress,
+                referee_data.game_status.stage_remain_time,
+                place_bits,
+                referee_data.robot_status.current_HP,
+                referee_data.power_heat_data.shooter_17mm_barrel_heat,
+                referee_data.power_heat_data.buffer_energy,
+                referee_data.allow_robot.allow_bullet_17,
+                referee_data.huart_robot.armor_id,
+                referee_data.huart_robot.HP_deducation_reason,
+                // 底层测试数据保留：
+                uart6_rx_count,
+                raw_data_dump[0], raw_data_dump[1], raw_data_dump[2], raw_data_dump[3]
                 );
             } else {
                 uart1->Print(uart1, "[REF RAW] Cnt: %d | Len: %d | Data: %02X %02X %02X %02X %02X %02X %02X %02X\r\n",
-                uart6_rx_count,
-                raw_data_len,
+                uart6_rx_count, raw_data_len,
                 raw_data_dump[0], raw_data_dump[1], raw_data_dump[2], raw_data_dump[3],
                 raw_data_dump[4], raw_data_dump[5], raw_data_dump[6], raw_data_dump[7]);
             }
@@ -353,6 +371,10 @@ void Referee_CAN_Forward(void) {
     uint8_t tx_data[8];
     uint32_t send_mail_box;
 
+    // ==========================================
+    // 第一帧 (ID: 0x101) - 核心高频数据 (8 字节满载)
+    // ==========================================
+
     // 1. 配置 CAN 发送头
     tx_header.StdId = 0x101;           // 我们自定义的“车牌号” ID
     tx_header.ExtId = 0;
@@ -363,25 +385,42 @@ void Referee_CAN_Forward(void) {
 
     // 2. 数据拆解打包 (利用位移操作，把 16位 拆成两个 8位)
     // 注意：这里采用大端序(高位在前)，接收端也必须按照这个顺序还原
-
-    // Byte 0-1: 当前血量 (current_HP)
     tx_data[0] = (referee_data.robot_status.current_HP >> 8) & 0xFF;
     tx_data[1] = referee_data.robot_status.current_HP & 0xFF;
 
-    // Byte 2-3: 17mm当前热量 (shooter_17mm_barrel_heat)
     tx_data[2] = (referee_data.power_heat_data.shooter_17mm_barrel_heat >> 8) & 0xFF;
     tx_data[3] = referee_data.power_heat_data.shooter_17mm_barrel_heat & 0xFF;
 
-    // Byte 4-5: 底盘缓冲能量 (buffer_energy)
     tx_data[4] = (referee_data.power_heat_data.buffer_energy >> 8) & 0xFF;
     tx_data[5] = referee_data.power_heat_data.buffer_energy & 0xFF;
 
-    // Byte 6-7: 当前阶段剩余时间 (stage_remain_time)
     tx_data[6] = (referee_data.game_status.stage_remain_time >> 8) & 0xFF;
     tx_data[7] = referee_data.game_status.stage_remain_time & 0xFF;
 
-    // 3. 将组装好的数据推入 CAN2 的发送邮箱
-    // 注意：如果是频率极高的发送，建议像串口一样加一个邮箱是否满的判断。
-    // 但如果只是在 10Hz/50Hz 的任务里调用，直接发送即可。
     HAL_CAN_AddTxMessage(&hcan2, &tx_header, tx_data, &send_mail_box);
+
+
+    // ==========================================
+    // 第二帧 (ID: 0x102) - 弹药与事件数据 (4 字节有效，其余补0)
+    // ==========================================
+    tx_header.StdId = 0x102;
+    uint8_t tx_data2[8] = {0}; // 必须清零，保证后4字节干净
+
+    // Byte 0-1: 17mm 允许发弹量
+    tx_data2[0] = (referee_data.allow_robot.allow_bullet_17 >> 8) & 0xFF;
+    tx_data2[1] = referee_data.allow_robot.allow_bullet_17 & 0xFF;
+
+    // Byte 2: 【碎片合并】装甲板ID(高4位) | 扣血原因(低4位)
+    tx_data2[2] = ((referee_data.huart_robot.armor_id & 0x0F) << 4) |
+                  (referee_data.huart_robot.HP_deducation_reason & 0x0F);
+
+    // Byte 3: 【碎片合并】场地bit23-24 (高2位) | 比赛进度(低4位)
+    // 先把 place_t 右移23位，只取最后两位的状态 (0x03)
+    uint8_t place_status_bits = (referee_data.place_status.place_t >> 23) & 0x03;
+    tx_data2[3] = (place_status_bits << 4) |
+                  (referee_data.game_status.game_progress & 0x0F);
+
+    // 塞进 CAN2 邮箱
+    HAL_CAN_AddTxMessage(&hcan2, &tx_header, tx_data2, &send_mail_box);
+
 }

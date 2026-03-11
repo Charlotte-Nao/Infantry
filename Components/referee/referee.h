@@ -22,6 +22,11 @@ typedef struct __attribute__((packed)) {
     uint64_t SyncTimeStamp;      // 机器人与裁判系统时间同步的 UNIX 时间戳 (微秒)
 } ext_game_status_t;
 
+// 1. 0x0101（4字节）
+typedef struct __attribute__((packed)) {
+    uint32_t place_t;           //场地信息
+} ext_place_status_t;
+
 // 2. 机器人性能状态数据：0x0201 (13字节，10Hz发送) —— 【云台/底盘核心】
 typedef struct __attribute__((packed)) {
     uint8_t robot_id;                        // 本机器人ID (1:红英雄, 3/4/5:红步兵, 7:红哨兵 | 101:蓝英雄, 103/104/105:蓝步兵...)
@@ -53,12 +58,29 @@ typedef struct __attribute__((packed)) {
     float yaw;  // 本机器人的陀螺仪偏航角 (单位：度)
 } ext_game_robot_pos_t;
 
+//5、 机器人受击数据 ：0x0206（受击情况）
+typedef struct __attribute__((packed)) {
+    uint8_t armor_id : 4;
+    uint8_t HP_deducation_reason : 4;
+} ext_huart_robot_data_t;
+
+//6、 机器人发弹相关 ： 0x0208（弹药情况）
+typedef struct __attribute__((packed)) {
+    uint16_t allow_bullet_17;
+    uint16_t allow_bullet_42;
+    uint16_t money_left;
+    uint16_t extra_bullet;
+}ext_allow_robot_data_t;
+
 // 裁判系统总控结构体
 typedef struct {
     ext_game_status_t       game_status;     // 包含：比赛阶段、剩余时间
+    ext_place_status_t      place_status;    // 包含： 场地信息
     ext_game_robot_status_t robot_status;    // 包含：等级、血量、热量上限、功率上限
     ext_power_heat_data_t   power_heat_data; // 包含：当前17mm热量、缓冲能量
     ext_game_robot_pos_t    robot_pos;       // 包含：X, Y, Z, Yaw 坐标与朝向
+    ext_huart_robot_data_t  huart_robot;     // 包含受伤情况
+    ext_allow_robot_data_t  allow_robot;     // 弹药可用情况
 
     uint32_t last_update_tick; // 掉线检测时间戳
 } referee_info_t;
