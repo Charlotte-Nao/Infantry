@@ -9,6 +9,7 @@
 #include "motor.h"
 #include "math.h"
 #include "cmsis_os.h"
+#include "D:/all_code/clion/infantry/Application/robot_global.h"
 #include "../../Bsp/LED/bsp_LED.h"
 
 #define pi (fp32)M_PI
@@ -1466,6 +1467,14 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
 
     /* --- 处理 CAN2 总线 (达妙 + 发射机构) --- */
     if (hcan == &hcan2) {
+        //新增一下拦截解析下位C板数据信息的can信息解析，对应ID为 0x101
+        if (rx_header.StdId == 0x101) {
+            // 利用位移操作，将大端序的 2 个 uint8 拼成 1 个 uint16
+            gateway_data.current_HP               = (rx_data[0] << 8) | rx_data[1];
+            gateway_data.shooter_17mm_barrel_heat = (rx_data[2] << 8) | rx_data[3];
+            gateway_data.buffer_energy            = (rx_data[4] << 8) | rx_data[5];
+            gateway_data.stage_remain_time        = (rx_data[6] << 8) | rx_data[7];
+        }
         // 1. 达妙电机反馈 (达妙反馈 ID 通常为 0x00，内部通过 Data[0] 区分 ID)
         if (rx_header.StdId == 0x00) {
             struct motor_device *dm = motor_get_device("J4310_PITCH");

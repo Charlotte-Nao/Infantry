@@ -7,6 +7,8 @@
 #include "cmsis_os.h"
 #include "stdio.h"
 #include "../Bsp/LED/bsp_LED.h"
+#include "../Bsp/uart/bsp_uart.h"       // 你的串口打印组件
+#include "../Application/robot_global.h" // 包含 gateway_data 全局变量
 
 /* --- 逻辑常量与控制参数 --- */
 #define GIMBAL_YAW_SENS         0.010f
@@ -71,6 +73,28 @@ void chassis_task_func(void const * argument) {
     // 主循环
     while (1) {
         uint32_t current_tick = osKernelSysTick();
+
+        //打印接受的数据
+        static uint32_t last_gateway_print_tick = 0;
+        if (current_tick - last_gateway_print_tick > 500) {
+            struct uart_device *uart1 = uart_get_device("uart1_dma");
+            if (uart1 != NULL) {
+                // 打印刚刚在 motor.c 中用移位法拼装好的数据
+                uart1->Print(uart1,
+                    "====== MAIN BOARD CAN RX TEST ======\r\n"
+                    "  > HP    : %d \r\n"
+                    "  > Heat  : %d \r\n"
+                    "  > Buffer: %d J \r\n"
+                    "  > Time  : %d s \r\n"
+                    "====================================\r\n\r\n",
+                    gateway_data.current_HP,
+                    gateway_data.shooter_17mm_barrel_heat,
+                    gateway_data.buffer_energy,
+                    gateway_data.stage_remain_time
+                );
+            }
+            last_gateway_print_tick = current_tick;
+        }
 
         /**************************************************************************************************************/
         // 遥控器掉线检测

@@ -61,7 +61,16 @@ typedef struct {
 
 } robot_ctrl_info_t;
 
+/* --- 裁判系统网关接收数据 --- */
+typedef struct {
+    uint16_t current_HP;               // 当前血量
+    uint16_t shooter_17mm_barrel_heat; // 17mm当前热量
+    uint16_t buffer_energy;            // 底盘缓冲能量
+    uint16_t stage_remain_time;        // 比赛剩余时间
+} gateway_referee_t;
+
 /* --- 全局变量声明 --- */
+extern gateway_referee_t gateway_data; // 暴露给全局使用
 extern robot_ctrl_info_t robot_ctrl;
 
 /* --- 核心工具函数 --- */
