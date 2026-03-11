@@ -62,12 +62,21 @@ typedef struct {
 } robot_ctrl_info_t;
 
 /* --- 裁判系统网关接收数据 --- */
-extern uint8_t can_test_raw[8]; // 用来抓取 CAN 进来的原始 8 个字节
+extern uint8_t can_raw_101[8];
+extern uint8_t can_raw_102[8];
 typedef struct {
+    // 0x101 核心数据
     uint16_t current_HP;               // 当前血量
     uint16_t shooter_17mm_barrel_heat; // 17mm当前热量
     uint16_t buffer_energy;            // 底盘缓冲能量
     uint16_t stage_remain_time;        // 比赛剩余时间
+
+    // 0x102 附加数据
+    uint16_t allow_bullet_17;          // 17mm允许发弹量
+    uint8_t  armor_id;                 // 受击装甲板ID
+    uint8_t  HP_deducation_reason;     // 扣血原因
+    uint8_t  place_status;             // 场地占用情况 (0~3)
+    uint8_t  game_progress;            // 比赛进度
 } gateway_referee_t;
 
 /* --- 全局变量声明 --- */

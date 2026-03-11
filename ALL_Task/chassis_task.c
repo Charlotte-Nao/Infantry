@@ -81,23 +81,31 @@ void chassis_task_func(void const * argument) {
         if (current_tick - last_gateway_print_tick > 500) {
             struct uart_device *uart1 = uart_get_device("uart1_dma");
             if (uart1 != NULL) {
-                // 打印刚刚在 motor.c 中用移位法拼装好的数据
                 uart1->Print(uart1,
                 "====== MAIN BOARD CAN RX TEST ======\r\n"
-                "  > cnt:       %d \r\n"
-                "  > ori_mes:   %02X %02X %02X %02X %02X %02X %02X %02X \r\n"
-                "  > HP:        %d \r\n"
-                "  > Heat:      %d \r\n"
-                "  > time:      %d \r\n"
-                "  > Buffer:    %d J \r\n"
+                " [Test] CAN_Cnt: %d \r\n"
+                " [RAW 101]: %02X %02X %02X %02X %02X %02X %02X %02X \r\n"
+                " [RAW 102]: %02X %02X %02X %02X %02X %02X %02X %02X \r\n"
+                "------------------------------------\r\n"
+                "  > Game : Prog: %d | Time: %d s | Place: %d\r\n"
+                "  > State: HP: %d | Heat: %d | Buf: %d J\r\n"
+                "  > Shoot: Allow17: %d | ArmorID: %d | Hurt: %d\r\n"
                 "====================================\r\n\r\n",
                 cnt,
-                can_test_raw[0], can_test_raw[1], can_test_raw[2], can_test_raw[3],
-                can_test_raw[4], can_test_raw[5], can_test_raw[6], can_test_raw[7],
+                can_raw_101[0], can_raw_101[1], can_raw_101[2], can_raw_101[3],
+                can_raw_101[4], can_raw_101[5], can_raw_101[6], can_raw_101[7],
+                can_raw_102[0], can_raw_102[1], can_raw_102[2], can_raw_102[3],
+                can_raw_102[4], can_raw_102[5], can_raw_102[6], can_raw_102[7],
+                // 解析后的黄金数据：
+                gateway_data.game_progress,
+                gateway_data.stage_remain_time,
+                gateway_data.place_status,
                 gateway_data.current_HP,
                 gateway_data.shooter_17mm_barrel_heat,
-                gateway_data.stage_remain_time,
-                gateway_data.buffer_energy
+                gateway_data.buffer_energy,
+                gateway_data.allow_bullet_17,
+                gateway_data.armor_id,
+                gateway_data.HP_deducation_reason
                 );
             }
             last_gateway_print_tick = current_tick;
