@@ -84,15 +84,19 @@ void chassis_task_func(void const * argument) {
                 // 打印刚刚在 motor.c 中用移位法拼装好的数据
                 uart1->Print(uart1,
                 "====== MAIN BOARD CAN RX TEST ======\r\n"
-                "  > cnt   : %d \r\n"
-                "  > RAW   : %02X %02X %02X %02X %02X %02X %02X %02X \r\n"
-                "  > HP    : %d \r\n"
-                "  > Buffer: %d J \r\n"
+                "  > cnt:       %d \r\n"
+                "  > ori_mes:   %02X %02X %02X %02X %02X %02X %02X %02X \r\n"
+                "  > HP:        %d \r\n"
+                "  > Heat:      %d \r\n"
+                "  > time:      %d \r\n"
+                "  > Buffer:    %d J \r\n"
                 "====================================\r\n\r\n",
                 cnt,
                 can_test_raw[0], can_test_raw[1], can_test_raw[2], can_test_raw[3],
                 can_test_raw[4], can_test_raw[5], can_test_raw[6], can_test_raw[7],
                 gateway_data.current_HP,
+                gateway_data.shooter_17mm_barrel_heat,
+                gateway_data.stage_remain_time,
                 gateway_data.buffer_energy
                 );
             }

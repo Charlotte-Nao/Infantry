@@ -62,7 +62,7 @@ typedef struct {
 } robot_ctrl_info_t;
 
 /* --- 裁判系统网关接收数据 --- */
-extern uint8_t can_test_raw[8]; // 【新增】用来抓取 CAN 进来的原始 8 个字节
+extern uint8_t can_test_raw[8]; // 用来抓取 CAN 进来的原始 8 个字节
 typedef struct {
     uint16_t current_HP;               // 当前血量
     uint16_t shooter_17mm_barrel_heat; // 17mm当前热量
