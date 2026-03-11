@@ -13,6 +13,9 @@ referee_info_t referee_data;
 uint8_t ref_rx_buf[2][REF_RX_BUF_SIZE];
 uint8_t ref_tx_buf[REF_RX_BUF_SIZE]; // 【新增】发送缓冲区
 static uint8_t tx_seq = 0; // 【新增】发送包序号
+uint32_t uart6_rx_count = 0; // 全局测试变量
+uint8_t  raw_data_dump[10] = {0}; // 【新增】用来保存前 10 个字节的生肉数据
+uint16_t raw_data_len = 0;        // 【新增】记录这次到底收到多长的数据
 
 // ==================== 官方 CRC8 和 CRC16 校验代码 (来自协议附录一) ====================
 
@@ -179,6 +182,10 @@ void Referee_Init(void) {
 }
 
 void USART6_IRQHandler(void) {
+
+    uart6_rx_count++; // 只要硬件产生中断，这个数就会疯涨
+
+
     if (huart6.Instance->SR & UART_FLAG_IDLE) {
         __HAL_UART_CLEAR_IDLEFLAG(&huart6);
         uint16_t rx_len;
@@ -200,6 +207,11 @@ void USART6_IRQHandler(void) {
 }
 
 void Referee_Data_Parse(uint8_t *rx_buf, uint16_t len) {
+    raw_data_len = len;
+    for (int i = 0; i < 10 && i < len; i++) {
+        raw_data_dump[i] = rx_buf[i];
+    }
+
     uint16_t parsed_index = 0;
 
     while (parsed_index < len) {
@@ -325,8 +337,11 @@ void Referee_Debug_Print(void) {
                     referee_data.robot_pos.yaw
                 );
             } else {
-                // 如果没收到数据，打印离线警告
-                uart1->Print(uart1, "[REF ERROR] No Data Received! Check UART6 / RX Line...\r\n");
+                uart1->Print(uart1, "[REF RAW] Cnt: %d | Len: %d | Data: %02X %02X %02X %02X %02X %02X %02X %02X\r\n",
+                uart6_rx_count,
+                raw_data_len,
+                raw_data_dump[0], raw_data_dump[1], raw_data_dump[2], raw_data_dump[3],
+                raw_data_dump[4], raw_data_dump[5], raw_data_dump[6], raw_data_dump[7]);
             }
         }
         last_print_tick = osKernelSysTick();
