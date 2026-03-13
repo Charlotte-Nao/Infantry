@@ -90,6 +90,7 @@ void chassis_task_func(void const * argument) {
                 "  > Game : Prog: %d | Time: %d s | Place: %d\r\n"
                 "  > State: HP: %d | Heat: %d | Buf: %d J\r\n"
                 "  > Shoot: Allow17: %d | ArmorID: %d | Hurt: %d\r\n"
+                "  test_test\r\n"
                 "====================================\r\n\r\n",
                 cnt,
                 can_raw_101[0], can_raw_101[1], can_raw_101[2], can_raw_101[3],
