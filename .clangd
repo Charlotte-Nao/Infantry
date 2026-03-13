@@ -1,0 +1,8 @@
+CompileFlags:
+  CompilationDatabase: build/Release
+  Add:
+    - -IE:/STM32cubeCLT/STM32CubeCLT_1.19.0/GNU-tools-for-STM32/arm-none-eabi/include
+
+Diagnostics:
+  Suppress:
+    - redefinition_different_typedef

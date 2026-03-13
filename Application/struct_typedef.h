@@ -18,6 +18,3 @@ typedef double fp64;
 
 
 #endif
-
-
-
